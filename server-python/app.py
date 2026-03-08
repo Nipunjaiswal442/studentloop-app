@@ -28,6 +28,9 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
+with app.app_context():
+    init_db()
+
 PORT = int(os.environ.get('PORT', 3001))
 JWT_SECRET = os.environ.get('JWT_SECRET', 'studentloop-dev-secret-key-2026')
 
