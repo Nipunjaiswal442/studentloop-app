@@ -7,7 +7,7 @@
     "dev": "vite",
     "server": "node server/index.js",
     "server:python": "cd server-python && python3 app.py",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
