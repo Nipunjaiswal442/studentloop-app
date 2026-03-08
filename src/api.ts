@@ -1,7 +1,7 @@
 /* ── StudentLoop API Client ── */
 /* Updated: Removed Google OAuth, uses email/password auth only */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 function getToken(): string | null {
     return localStorage.getItem('sl_token');
