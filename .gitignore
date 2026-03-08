@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+server-python/__pycache__/
+server-python/studentloop.db
+*.db
+.DS_Store

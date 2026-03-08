@@ -1,0 +1,223 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 260 20% 4%;
+    --foreground: 0 0% 98%;
+    --card: 260 15% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 260 15% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 270 80% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 260 15% 15%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 260 15% 15%;
+    --muted-foreground: 260 10% 60%;
+    --accent: 280 85% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 260 15% 18%;
+    --input: 260 15% 18%;
+    --ring: 270 80% 60%;
+    --radius: 0.75rem;
+
+    /* Custom Purple-Black Theme Colors */
+    --purple-deep: 260 80% 45%;
+    --purple-primary: 270 80% 60%;
+    --purple-bright: 280 90% 65%;
+    --purple-light: 285 100% 75%;
+    --neon-purple: 275 100% 70%;
+    --dark-bg: 260 20% 4%;
+    --dark-card: 260 15% 8%;
+    --dark-elevated: 260 12% 12%;
+    --success: 150 70% 50%;
+    --warning: 45 90% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer utilities {
+  .gradient-purple {
+    background: linear-gradient(135deg, hsl(var(--purple-primary)) 0%, hsl(var(--purple-bright)) 100%);
+  }
+
+  .gradient-dark {
+    background: linear-gradient(180deg, hsl(var(--dark-card)) 0%, hsl(var(--dark-bg)) 100%);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px hsl(var(--purple-primary) / 0.4), 0 0 40px hsl(var(--purple-primary) / 0.2);
+  }
+
+  .glow-text {
+    text-shadow: 0 0 20px hsl(var(--purple-primary) / 0.6);
+  }
+
+  .glass-card {
+    background: hsl(var(--dark-card) / 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out;
+  }
+
+  .animate-bounce-soft {
+    animation: bounce-soft 2s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 5px hsl(var(--purple-primary) / 0.4), 0 0 10px hsl(var(--purple-primary) / 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 15px hsl(var(--purple-primary) / 0.6), 0 0 30px hsl(var(--purple-primary) / 0.3);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bounce-soft {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes status-pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.3);
+    opacity: 0.7;
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, hsl(var(--purple-primary) / 0.15) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+.animate-status-pulse {
+  animation: status-pulse 1.5s ease-in-out infinite;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, hsl(var(--purple-primary)) 0%, hsl(var(--purple-bright)) 50%, hsl(var(--purple-light)) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.trust-ring {
+  filter: drop-shadow(0 0 6px hsl(var(--purple-primary) / 0.5));
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--dark-bg));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--purple-primary) / 0.5);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--purple-primary) / 0.7);
+}
+
+/* Mobile viewport fix */
+@supports (height: 100dvh) {
+  .h-screen {
+    height: 100dvh;
+  }
+}
