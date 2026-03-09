@@ -3,7 +3,7 @@ export type Screen =
     | 'onboarding' | 'home' | 'post' | 'accept' | 'tracking' | 'profile'
     | 'wallet' | 'shop' | 'cart' | 'orderSummary' | 'orderTracking'
     | 'deliveryDashboard' | 'deliveryAccepted' | 'uploadBill' | 'otpConfirm'
-    | 'orderHistory' | 'reportIssue';
+    | 'orderHistory' | 'reportIssue' | 'addShop';
 
 export type Tab = 'home' | 'post' | 'deliveries' | 'wallet' | 'profile';
 

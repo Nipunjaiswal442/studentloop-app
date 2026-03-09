@@ -91,4 +91,10 @@ export const api = {
     activity: {
         list: () => request<{ activity: any[] }>('/api/activity'),
     },
+
+    shops: {
+        list: () => request<{ shops: any[] }>('/api/shops'),
+        create: (data: { name: string; category: string; image: string; menu: { name: string; price: number; description: string }[] }) =>
+            request<{ shop: any }>('/api/shops', { method: 'POST', body: JSON.stringify(data) }),
+    },
 };

@@ -166,6 +166,28 @@ CREATE TABLE IF NOT EXISTS activity_log (
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Dynamic Shops
+CREATE TABLE IF NOT EXISTS shops (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    category      TEXT NOT NULL,
+    distance      TEXT DEFAULT '0.1 km',
+    rating        REAL DEFAULT 5.0,
+    image         TEXT DEFAULT '🏪',
+    delivery_time TEXT DEFAULT '15 min',
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Dynamic Menu Items
+CREATE TABLE IF NOT EXISTS menu_items (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    shop_id       INTEGER NOT NULL REFERENCES shops(id),
+    name          TEXT NOT NULL,
+    price         INTEGER NOT NULL,
+    description   TEXT DEFAULT '',
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
@@ -175,6 +197,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_requests_status ON delivery_requests(status);
+
 """
 
 

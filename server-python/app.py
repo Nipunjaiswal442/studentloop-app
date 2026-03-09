@@ -576,6 +576,53 @@ def list_activity():
 
 
 # ═══════════════════════════════════════════
+#  SHOPS
+# ═══════════════════════════════════════════
+
+@app.route('/api/shops', methods=['GET'])
+def list_shops():
+    db = get_db()
+    shops = dict_rows(db.execute('SELECT * FROM shops ORDER BY created_at DESC').fetchall())
+    for s in shops:
+        s['menu'] = dict_rows(db.execute('SELECT * FROM menu_items WHERE shop_id = ?', (s['id'],)).fetchall())
+    return jsonify({'shops': shops})
+
+
+@app.route('/api/shops', methods=['POST'])
+@auth_required
+def create_shop():
+    data = request.get_json(force=True)
+    name = data.get('name', '')
+    category = data.get('category', 'Food')
+    menu_items = data.get('menu', [])
+    image = data.get('image', '🏪')
+    
+    if not name:
+        return jsonify({'error': 'Shop name is required'}), 400
+        
+    db = get_db()
+    
+    cur = db.execute(
+        'INSERT INTO shops (name, category, image, distance, rating, delivery_time) VALUES (?, ?, ?, ?, ?, ?)',
+        (name, category, image, '0.1 km', 5.0, '10 min')
+    )
+    shop_id = cur.lastrowid
+    
+    for item in menu_items:
+        db.execute(
+            'INSERT INTO menu_items (shop_id, name, price, description) VALUES (?, ?, ?, ?)',
+            (shop_id, item.get('name', ''), item.get('price', 0), item.get('description', ''))
+        )
+        
+    db.commit()
+    
+    shop = dict_row(db.execute('SELECT * FROM shops WHERE id = ?', (shop_id,)).fetchone())
+    shop['menu'] = dict_rows(db.execute('SELECT * FROM menu_items WHERE shop_id = ?', (shop_id,)).fetchall())
+    
+    return jsonify({'shop': shop})
+
+
+# ═══════════════════════════════════════════
 #  HEALTH CHECK
 # ═══════════════════════════════════════════
 

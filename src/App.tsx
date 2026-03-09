@@ -8,7 +8,7 @@ import {
   Eye, EyeOff, Mail, Lock, UserPlus, Globe
 } from 'lucide-react';
 import {
-  type Screen, type Tab, type CartItem, type Order, type Profile,
+  type Screen, type Tab, type CartItem, type Order, type Profile, type Shop, type MenuItem,
   CATEGORIES, CAT_EMOJIS, SHOPS, MENU_ITEMS, DELIVERY_REQUESTS,
   SAMPLE_ORDERS, DEFAULT_PROFILE, ISSUE_TYPES, ACTIVITY, urgencyColor,
 } from './data';
@@ -59,6 +59,14 @@ export default function App() {
   const [liveDeliveries, setLiveDeliveries] = useState<ApiDeliveryRequest[]>([]);
   const [deliveriesLoading, setDeliveriesLoading] = useState(false);
 
+  /* ── Live Shops & Menu ── */
+  const [liveShops, setLiveShops] = useState<Shop[]>([]);
+  const [liveMenu, setLiveMenu] = useState<MenuItem[]>([]);
+
+  /* ── Wallet Txns ── */
+  const [walletTxns, setWalletTxns] = useState<any[]>([]);
+
+
   /* ── Post form state ── */
   const [postTitle, setPostTitle] = useState('');
   const [postCategory, setPostCategory] = useState('Food');
@@ -82,6 +90,29 @@ export default function App() {
     finally { setDeliveriesLoading(false); }
   }, []);
 
+  const fetchShops = useCallback(async () => {
+    try {
+      const res = await api.shops.list();
+      const newShops: Shop[] = res.shops.map(s => ({
+        id: s.id + 1000, name: s.name, category: s.category, distance: s.distance, rating: s.rating, image: s.image, deliveryTime: s.delivery_time
+      }));
+      const newMenu: MenuItem[] = res.shops.flatMap(s => s.menu.map((m: any) => ({
+        id: m.id + 10000, shopId: s.id + 1000, name: m.name, price: m.price, description: m.description
+      })));
+      setLiveShops(newShops);
+      setLiveMenu(newMenu);
+    } catch { }
+  }, []);
+
+  const fetchWallet = useCallback(async () => {
+    try {
+      const res = await api.wallet.get();
+      setWalletBalance(res.balance);
+      setBonusCoins(res.bonusCoins);
+      setWalletTxns(res.transactions);
+    } catch { }
+  }, []);
+
   const nav = (s: Screen) => { setPrevScreen(() => screen); setScreen(s); };
   const handleTab = (t: Tab) => {
     setTab(t);
@@ -89,11 +120,16 @@ export default function App() {
     nav(map[t]);
     // Auto-refresh deliveries when switching to that tab
     if (t === 'deliveries') fetchDeliveries();
+    if (t === 'wallet') fetchWallet();
+    if (t === 'home') fetchShops();
   };
 
-  const shop = SHOPS.find(s => s.id === selectedShopId)!;
-  const shopMenu = MENU_ITEMS.filter(m => m.shopId === selectedShopId);
-  const filtered = filter === 'All' ? SHOPS : SHOPS.filter(s => s.category === filter);
+  const allShops = [...SHOPS, ...liveShops];
+  const allMenu = [...MENU_ITEMS, ...liveMenu];
+
+  const shop = allShops.find(s => s.id === selectedShopId)!;
+  const shopMenu = allMenu.filter(m => m.shopId === selectedShopId);
+  const filtered = filter === 'All' ? allShops : allShops.filter(s => s.category === filter);
   const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
   const addToCart = (item: typeof MENU_ITEMS[0]) => {
@@ -119,11 +155,12 @@ export default function App() {
   useEffect(() => {
     const token = localStorage.getItem('sl_token');
     if (token) {
+      fetchShops();
       api.auth.me()
         .then(({ user }) => { syncUserToProfile(user); setTab('home'); setScreen('home'); })
         .catch(() => { clearToken(); });
     }
-  }, [syncUserToProfile]);
+  }, [syncUserToProfile, fetchShops]);
 
   /* ── Email/Password auth handler ── */
   const handleLogin = async () => {
@@ -134,6 +171,7 @@ export default function App() {
         : await api.auth.signUp(profile.email, password, fullName);
       setToken(res.token);
       syncUserToProfile(res.user);
+      await fetchShops();
       setTab('home'); nav('home');
     } catch (err: any) {
       setAuthError(err.message || 'Authentication failed');
@@ -266,7 +304,10 @@ export default function App() {
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center justify-between mb-5">
           <div><p className="text-muted-foreground text-xs">Good evening 👋</p><h1 className="text-xl font-bold">Hey, {profile.email.split('@')[0] || 'Student'}!</h1></div>
-          <button onClick={() => handleTab('profile')} className="w-10 h-10 rounded-full gradient-purple flex items-center justify-center text-lg">🧑‍🎓</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => nav('addShop')} className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-lg hover:border-purple-500/50 transition"><Plus size={18} className="text-purple-400" /></button>
+            <button onClick={() => handleTab('profile')} className="w-10 h-10 rounded-full gradient-purple flex items-center justify-center text-lg">🧑‍🎓</button>
+          </div>
         </div>
         <div className="relative mb-4">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -785,19 +826,19 @@ export default function App() {
           <div className="flex gap-3">
             <input type="number" placeholder="Enter amount" value={addMoneyAmt} onChange={e => setAddMoneyAmt(e.target.value)}
               className="flex-1 bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
-            <button onClick={() => { if (addMoneyAmt) { setWalletBalance(b => b + Number(addMoneyAmt)); setAddMoneyAmt(''); } }}
+            <button onClick={async () => { if (addMoneyAmt) { try { const res = await api.wallet.addMoney(Number(addMoneyAmt)); setWalletBalance(res.balance); setBonusCoins(res.bonusCoins); fetchWallet(); setAddMoneyAmt(''); } catch (e) { alert('Failed'); } } }}
               className="px-6 py-3 rounded-xl gradient-purple text-white text-sm font-semibold flex items-center gap-2"><CreditCard size={14} />Add via UPI</button>
           </div>
         </div>
         <h3 className="text-sm font-semibold mb-3">Recent Transactions</h3>
         <div className="space-y-2">
-          {[{ text: 'Order — Blue Tokai Café', amt: '-₹195', color: 'text-red-400', time: '2h ago' }, { text: 'Delivery Reward — Biryani', amt: '+₹75', color: 'text-green-400', time: '5h ago' },
-          { text: 'Added via UPI', amt: '+₹500', color: 'text-green-400', time: '1d ago' }, { text: 'Order — Campus Store', amt: '-₹160', color: 'text-red-400', time: '2d ago' }].map((t, i) => (
+          {walletTxns.map((t, i) => (
             <div key={i} className="glass-card rounded-xl p-3.5 flex items-center justify-between">
-              <div><p className="text-xs font-medium">{t.text}</p><p className="text-[10px] text-muted-foreground">{t.time}</p></div>
-              <span className={`text-sm font-bold ${t.color}`}>{t.amt}</span>
+              <div><p className="text-xs font-medium">{t.description}</p><p className="text-[10px] text-muted-foreground">{new Date(t.created_at).toLocaleString()}</p></div>
+              <span className={`text-sm font-bold ${t.type === 'credit' ? 'text-green-400' : 'text-red-400'}`}>{t.type === 'credit' ? '+' : '-'}₹{t.amount}</span>
             </div>
           ))}
+          {walletTxns.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">No transactions yet.</p>}
         </div>
       </div>
       <BottomNav />
@@ -851,6 +892,62 @@ export default function App() {
       </div>
     </div>
   );
+
+  /* ═══════ ADD SHOP / STALL ═══════ */
+  if (screen === 'addShop') {
+    const [shopName, setShopName] = useState('');
+    const [shopCategory, setShopCategory] = useState('Food');
+    const [shopItems, setShopItems] = useState<{ name: string, price: string, description: string }[]>([{ name: '', price: '', description: '' }]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleCreateShop = async () => {
+      if (!shopName.trim() || shopItems.some(i => !i.name.trim() || !i.price)) return alert("Please fill all fields");
+      setIsSubmitting(true);
+      try {
+        await api.shops.create({
+          name: shopName,
+          category: shopCategory,
+          image: CAT_EMOJIS[shopCategory] || '🏪',
+          menu: shopItems.map(i => ({ name: i.name, price: Number(i.price), description: i.description }))
+        });
+        await fetchShops(); // refresh list
+        nav('home');
+      } catch (e) { alert("Failed to save business"); }
+      finally { setIsSubmitting(false); }
+    };
+
+    return (
+      <div className="min-h-screen max-w-md mx-auto pb-24 animate-slide-up">
+        <div className="px-5 pt-6 pb-3 flex items-center gap-3"><BackBtn to="home" /><h1 className="text-lg font-bold">Add Business/Stall</h1></div>
+        <div className="px-5 space-y-4">
+          <div className="glass-card rounded-2xl p-4">
+            <h3 className="text-sm font-semibold mb-3">Stall Details</h3>
+            <input placeholder="Stall Name" value={shopName} onChange={e => setShopName(e.target.value)} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-3" />
+            <select value={shopCategory} onChange={e => setShopCategory(e.target.value)} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-1">
+              {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="glass-card rounded-2xl p-4">
+            <h3 className="text-sm font-semibold mb-3">Menu Items</h3>
+            {shopItems.map((item, idx) => (
+              <div key={idx} className="flex flex-col gap-2 mb-4 pb-4 border-b border-border/50 last:border-0 last:mb-0 last:pb-0">
+                <input placeholder="Item Name" value={item.name} onChange={e => setShopItems(p => { const arr = [...p]; arr[idx].name = e.target.value; return arr; })} className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm focus:outline-none" />
+                <div className="flex gap-2">
+                  <input type="number" placeholder="Price (₹)" value={item.price} onChange={e => setShopItems(p => { const arr = [...p]; arr[idx].price = e.target.value; return arr; })} className="w-24 bg-card border border-border rounded-xl px-3 py-2 text-sm focus:outline-none" />
+                  <input placeholder="Short Description" value={item.description} onChange={e => setShopItems(p => { const arr = [...p]; arr[idx].description = e.target.value; return arr; })} className="flex-1 bg-card border border-border rounded-xl px-3 py-2 text-sm focus:outline-none" />
+                  {shopItems.length > 1 && <button onClick={() => setShopItems(p => p.filter((_, i) => i !== idx))} className="w-9 h-9 flex items-center justify-center text-red-400 bg-red-400/10 rounded-xl"><Minus size={14} /></button>}
+                </div>
+              </div>
+            ))}
+            <button onClick={() => setShopItems(p => [...p, { name: '', price: '', description: '' }])} className="w-full py-2.5 mt-2 rounded-xl border border-dashed border-purple-500/50 text-purple-400 text-sm font-semibold flex items-center justify-center gap-2 hover:bg-purple-500/10 transition"><Plus size={16} /> Add another item</button>
+          </div>
+          <button onClick={handleCreateShop} disabled={isSubmitting} className="w-full py-4 rounded-2xl gradient-purple text-white font-bold disabled:opacity-40 glow-purple flex items-center justify-center gap-2">{isSubmitting && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />} Save & Publish Shop</button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════ ERROR / CATCH-ALL ═══════ */
 
   /* ═══════ PROFILE ═══════ */
   return (
