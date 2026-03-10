@@ -422,9 +422,9 @@ export default function App() {
       <div className="px-5 mb-4">
         <label className="text-xs font-medium text-muted-foreground mb-2 block">Delivery Tip</label>
         <div className="flex gap-2">
-          {[0, 10, 20, 30].map(t => (
+          {[10, 20, 30, 40].map(t => (
             <button key={t} onClick={() => setTip(t)} className={`px-4 py-2.5 rounded-xl text-xs font-medium transition-all ${tip === t ? 'gradient-purple text-white' : 'bg-card border border-border text-muted-foreground'}`}>
-              {t === 0 ? 'No tip' : `₹${t}`}
+              {`₹${t}`}
             </button>
           ))}
         </div>
@@ -470,8 +470,34 @@ export default function App() {
             const otp = String(Math.floor(1000 + Math.random() * 9000));
             const ord: Order = { id: `ORD-${String(orders.length + 1).padStart(3, '0')}`, items: [...cart], shop, total, tip, status: 'pending', hostel: profile.hostelBlock || 'Hostel 7', room: profile.roomNumber || '312', otp, timestamp: 'Just now', deliveryReward: 30 + tip };
             setOrders(o => [ord, ...o]); setActiveOrder(ord); setTrackStep(0);
-            try { await api.wallet.addMoney(-total); } catch { }
-            setWalletBalance(b => b - total);
+            try {
+              // Create order in backend (debits wallet + logs transaction)
+              await api.orders.create({
+                items: cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, specialInstructions: c.specialInstructions })),
+                shopId: shop.id, shopName: shop.name, total, tip,
+                hostel: profile.hostelBlock || 'Hostel 7', room: profile.roomNumber || '312'
+              });
+              // Also create a delivery request so it shows up in the delivery dashboard for others
+              const itemNames = cart.map(c => `${c.name} x${c.qty}`);
+              await api.deliveries.create({
+                title: cart.map(c => c.name).join(' + '),
+                category: shop.category || 'Food',
+                pickup: shop.name,
+                dropLocation: `${profile.hostelBlock || 'Hostel'}, Room ${profile.roomNumber || '—'}`,
+                reward: 30,
+                tip: tip,
+                deadline: shop.deliveryTime || '15 min',
+                urgency: 'medium',
+                items: itemNames,
+              });
+              // Refresh wallet from server
+              const walletRes = await api.wallet.get();
+              setWalletBalance(walletRes.balance);
+              setBonusCoins(walletRes.bonusCoins);
+            } catch {
+              // Fallback: debit locally if API fails
+              setWalletBalance(b => b - total);
+            }
             setBonusCoins(c => c + Math.floor(total * 0.05)); setCart([]); nav('orderTracking');
           }} className="w-full py-4 rounded-2xl gradient-purple text-white font-bold disabled:opacity-40 glow-purple flex items-center justify-center gap-2">
             <CreditCard size={18} /> Confirm Order — ₹{total}
@@ -725,13 +751,12 @@ export default function App() {
     }
     try {
       const res = await api.deliveries.complete(selectedDelivery.id);
-      // Credit wallet from API response — syncUserToProfile already sets bonusCoins
+      // Sync full user state from API (wallet, deliveries count, points, etc.)
       if (res.user) {
         syncUserToProfile(res.user);
-      } else {
-        setWalletBalance(b => b + (selectedDelivery.reward + selectedDelivery.tip));
-        setBonusCoins(c => c + selectedDelivery.reward);
       }
+      // Also refresh wallet transactions so the earning shows in history
+      await fetchWallet();
       // Remove from live list
       setLiveDeliveries(prev => prev.filter(d => d.id !== selectedDelivery.id));
       handleTab('home');

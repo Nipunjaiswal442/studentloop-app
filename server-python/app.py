@@ -540,18 +540,32 @@ def complete_delivery(dr_id):
 
     db.execute("UPDATE delivery_requests SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (dr_id,))
 
-    total_earning = delivery['reward'] + delivery['tip']
+    reward = delivery['reward']
+    tip = delivery['tip']
+    total_earning = reward + tip
+
+    # Credit wallet and increment delivery count & points
     db.execute(
         'UPDATE users SET wallet_balance = wallet_balance + ?, deliveries = deliveries + 1, points = points + ? WHERE id = ?',
-        (total_earning, delivery['reward'], g.user_id)
+        (total_earning, reward, g.user_id)
     )
+
+    # Log delivery reward transaction
     db.execute(
         'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
-        (g.user_id, 'credit', total_earning, 'Delivery reward + tip', f'delivery_{dr_id}')
+        (g.user_id, 'credit', reward, f'Delivery reward — #{dr_id}', f'delivery_reward_{dr_id}')
     )
+
+    # Log tip as a separate transaction if any
+    if tip > 0:
+        db.execute(
+            'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
+            (g.user_id, 'credit', tip, f'Tip earned — delivery #{dr_id}', f'delivery_tip_{dr_id}')
+        )
+
     db.execute(
         'INSERT INTO activity_log (user_id, action, details, points) VALUES (?, ?, ?, ?)',
-        (g.user_id, 'delivery_completed', f'Completed delivery #{dr_id}', delivery['reward'])
+        (g.user_id, 'delivery_completed', f'Completed delivery #{dr_id} — earned ₹{total_earning}', reward)
     )
     db.commit()
 
