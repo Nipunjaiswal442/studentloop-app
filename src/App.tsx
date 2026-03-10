@@ -66,6 +66,12 @@ export default function App() {
   /* ── Wallet Txns ── */
   const [walletTxns, setWalletTxns] = useState<any[]>([]);
 
+  /* ── Add Shop form state (must be top-level for React hooks rule) ── */
+  const [shopName, setShopName] = useState('');
+  const [shopCategory, setShopCategory] = useState('Food');
+  const [shopItems, setShopItems] = useState<{ name: string; price: string; description: string }[]>([{ name: '', price: '', description: '' }]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   /* ── Post form state ── */
   const [postTitle, setPostTitle] = useState('');
@@ -460,10 +466,12 @@ export default function App() {
             {!canPay && <span className="text-xs text-red-400 bg-red-500/10 px-3 py-1.5 rounded-full">Insufficient balance</span>}
             {canPay && <span className="text-xs text-green-400 bg-green-500/10 px-3 py-1.5 rounded-full">✓ Sufficient</span>}
           </div>
-          <button disabled={!canPay} onClick={() => {
+          <button disabled={!canPay} onClick={async () => {
             const otp = String(Math.floor(1000 + Math.random() * 9000));
             const ord: Order = { id: `ORD-${String(orders.length + 1).padStart(3, '0')}`, items: [...cart], shop, total, tip, status: 'pending', hostel: profile.hostelBlock || 'Hostel 7', room: profile.roomNumber || '312', otp, timestamp: 'Just now', deliveryReward: 30 + tip };
-            setOrders(o => [ord, ...o]); setActiveOrder(ord); setTrackStep(0); setWalletBalance(b => b - total);
+            setOrders(o => [ord, ...o]); setActiveOrder(ord); setTrackStep(0);
+            try { await api.wallet.addMoney(-total); } catch { }
+            setWalletBalance(b => b - total);
             setBonusCoins(c => c + Math.floor(total * 0.05)); setCart([]); nav('orderTracking');
           }} className="w-full py-4 rounded-2xl gradient-purple text-white font-bold disabled:opacity-40 glow-purple flex items-center justify-center gap-2">
             <CreditCard size={18} /> Confirm Order — ₹{total}
@@ -894,85 +902,86 @@ export default function App() {
   );
 
   /* ═══════ ADD SHOP / STALL ═══════ */
-  if (screen === 'addShop') {
-    const [shopName, setShopName] = useState('');
-    const [shopCategory, setShopCategory] = useState('Food');
-    const [shopItems, setShopItems] = useState<{ name: string, price: string, description: string }[]>([{ name: '', price: '', description: '' }]);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+  const handleCreateShop = async () => {
+    if (!shopName.trim() || shopItems.some(i => !i.name.trim() || !i.price)) return alert('Please fill all fields');
+    setIsSubmitting(true);
+    try {
+      await api.shops.create({
+        name: shopName,
+        category: shopCategory,
+        image: CAT_EMOJIS[shopCategory] || '🏪',
+        menu: shopItems.map(i => ({ name: i.name, price: Number(i.price), description: i.description }))
+      });
+      await fetchShops();
+      setShopName(''); setShopCategory('Food');
+      setShopItems([{ name: '', price: '', description: '' }]);
+      nav('home');
+    } catch (e) { alert('Failed to save business'); }
+    finally { setIsSubmitting(false); }
+  };
 
-    const handleCreateShop = async () => {
-      if (!shopName.trim() || shopItems.some(i => !i.name.trim() || !i.price)) return alert("Please fill all fields");
-      setIsSubmitting(true);
-      try {
-        await api.shops.create({
-          name: shopName,
-          category: shopCategory,
-          image: CAT_EMOJIS[shopCategory] || '🏪',
-          menu: shopItems.map(i => ({ name: i.name, price: Number(i.price), description: i.description }))
-        });
-        await fetchShops(); // refresh list
-        nav('home');
-      } catch (e) { alert("Failed to save business"); }
-      finally { setIsSubmitting(false); }
-    };
-
-    return (
-      <div className="min-h-screen max-w-md mx-auto pb-24 animate-slide-up">
-        <div className="px-5 pt-6 pb-3 flex items-center gap-3"><BackBtn to="home" /><h1 className="text-lg font-bold">Add Business/Stall</h1></div>
-        <div className="px-5 space-y-4">
-          <div className="glass-card rounded-2xl p-4">
-            <h3 className="text-sm font-semibold mb-3">Stall Details</h3>
-            <input placeholder="Stall Name" value={shopName} onChange={e => setShopName(e.target.value)} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-3" />
-            <select value={shopCategory} onChange={e => setShopCategory(e.target.value)} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-1">
-              {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div className="glass-card rounded-2xl p-4">
-            <h3 className="text-sm font-semibold mb-3">Menu Items</h3>
-            {shopItems.map((item, idx) => (
-              <div key={idx} className="flex flex-col gap-2 mb-4 pb-4 border-b border-border/50 last:border-0 last:mb-0 last:pb-0">
-                <input placeholder="Item Name" value={item.name} onChange={e => setShopItems(p => { const arr = [...p]; arr[idx].name = e.target.value; return arr; })} className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm focus:outline-none" />
-                <div className="flex gap-2">
-                  <input type="number" placeholder="Price (₹)" value={item.price} onChange={e => setShopItems(p => { const arr = [...p]; arr[idx].price = e.target.value; return arr; })} className="w-24 bg-card border border-border rounded-xl px-3 py-2 text-sm focus:outline-none" />
-                  <input placeholder="Short Description" value={item.description} onChange={e => setShopItems(p => { const arr = [...p]; arr[idx].description = e.target.value; return arr; })} className="flex-1 bg-card border border-border rounded-xl px-3 py-2 text-sm focus:outline-none" />
-                  {shopItems.length > 1 && <button onClick={() => setShopItems(p => p.filter((_, i) => i !== idx))} className="w-9 h-9 flex items-center justify-center text-red-400 bg-red-400/10 rounded-xl"><Minus size={14} /></button>}
-                </div>
-              </div>
+  if (screen === 'addShop') return (
+    <div className="min-h-screen max-w-md mx-auto pb-24 animate-slide-up">
+      <div className="px-5 pt-6 pb-3 flex items-center gap-3"><BackBtn to="home" /><h1 className="text-lg font-bold">Add Business / Stall</h1></div>
+      <div className="px-5 space-y-4">
+        <div className="glass-card rounded-2xl p-4">
+          <h3 className="text-sm font-semibold mb-3">Stall Details</h3>
+          <input placeholder="Stall / Business Name" value={shopName} onChange={e => setShopName(e.target.value)} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 mb-3" />
+          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Category</label>
+          <div className="flex gap-2 flex-wrap">
+            {CATEGORIES.filter(c => c !== 'All').map(c => (
+              <button key={c} onClick={() => setShopCategory(c)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-medium transition ${shopCategory === c ? 'bg-purple-500/15 border border-purple-500 text-purple-400' : 'bg-card border border-border text-muted-foreground hover:border-purple-500/50'}`}>{CatIcon[c]}{c}</button>
             ))}
-            <button onClick={() => setShopItems(p => [...p, { name: '', price: '', description: '' }])} className="w-full py-2.5 mt-2 rounded-xl border border-dashed border-purple-500/50 text-purple-400 text-sm font-semibold flex items-center justify-center gap-2 hover:bg-purple-500/10 transition"><Plus size={16} /> Add another item</button>
           </div>
-          <button onClick={handleCreateShop} disabled={isSubmitting} className="w-full py-4 rounded-2xl gradient-purple text-white font-bold disabled:opacity-40 glow-purple flex items-center justify-center gap-2">{isSubmitting && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />} Save & Publish Shop</button>
         </div>
+        <div className="glass-card rounded-2xl p-4">
+          <h3 className="text-sm font-semibold mb-3">Menu Items</h3>
+          {shopItems.map((item, idx) => (
+            <div key={idx} className="flex flex-col gap-2 mb-4 pb-4 border-b border-border/50 last:border-0 last:mb-0 last:pb-0">
+              <input placeholder="Item Name" value={item.name} onChange={e => setShopItems(p => { const arr = [...p]; arr[idx] = { ...arr[idx], name: e.target.value }; return arr; })} className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
+              <div className="flex gap-2">
+                <input type="number" placeholder="Price (₹)" value={item.price} onChange={e => setShopItems(p => { const arr = [...p]; arr[idx] = { ...arr[idx], price: e.target.value }; return arr; })} className="w-24 bg-card border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
+                <input placeholder="Short Description" value={item.description} onChange={e => setShopItems(p => { const arr = [...p]; arr[idx] = { ...arr[idx], description: e.target.value }; return arr; })} className="flex-1 bg-card border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
+                {shopItems.length > 1 && <button onClick={() => setShopItems(p => p.filter((_, i) => i !== idx))} className="w-9 h-9 flex items-center justify-center text-red-400 bg-red-400/10 rounded-xl shrink-0"><Minus size={14} /></button>}
+              </div>
+            </div>
+          ))}
+          <button onClick={() => setShopItems(p => [...p, { name: '', price: '', description: '' }])} className="w-full py-2.5 mt-2 rounded-xl border border-dashed border-purple-500/50 text-purple-400 text-sm font-semibold flex items-center justify-center gap-2 hover:bg-purple-500/10 transition"><Plus size={16} /> Add another item</button>
+        </div>
+        <button onClick={handleCreateShop} disabled={isSubmitting} className="w-full py-4 rounded-2xl gradient-purple text-white font-bold disabled:opacity-40 glow-purple flex items-center justify-center gap-2">{isSubmitting && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />} Save & Publish Shop</button>
       </div>
-    );
-  }
-
-  /* ═══════ ERROR / CATCH-ALL ═══════ */
+    </div>
+  );
 
   /* ═══════ PROFILE ═══════ */
   return (
     <div className="min-h-screen max-w-md mx-auto pb-24 animate-fade-in">
       <div className="px-5 pt-6 pb-2">
         <h1 className="text-xl font-bold mb-5">Profile</h1>
-        <div className="flex items-center gap-4 mb-6">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-full gradient-purple flex items-center justify-center text-3xl glow-purple">🧑‍🎓</div>
+        <div className="flex items-center gap-4 mb-6 overflow-hidden">
+          <div className="relative shrink-0">
+            <div className="w-16 h-16 rounded-full gradient-purple flex items-center justify-center text-2xl glow-purple">🧑‍🎓</div>
             <svg className="absolute -inset-1.5 trust-ring" viewBox="0 0 92 92"><circle cx="46" cy="46" r="43" fill="none" stroke="hsl(270 80% 60% / 0.2)" strokeWidth="3" /><circle cx="46" cy="46" r="43" fill="none" stroke="hsl(270 80% 60%)" strokeWidth="3" strokeDasharray={`${0.87 * 2 * Math.PI * 43} ${2 * Math.PI * 43}`} strokeLinecap="round" transform="rotate(-90 46 46)" /></svg>
           </div>
-          <div>
-            <h2 className="text-lg font-bold">{profile.firstName || profile.email.split('@')[0] || 'Student'} {profile.lastName}</h2>
-            <p className="text-xs text-muted-foreground">{profile.email || 'student@college.edu'}</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-bold truncate">{profile.firstName || profile.email.split('@')[0] || 'Student'} {profile.lastName}</h2>
+            <p className="text-xs text-muted-foreground truncate">{profile.email || 'student@college.edu'}</p>
             <div className="flex items-center gap-1.5 mt-1"><Shield size={13} className="text-purple-400" /><span className="text-xs text-purple-400 font-medium">Trust Score: {profile.trustScore}%</span></div>
           </div>
         </div>
         {/* Profile Form */}
         <div className="glass-card rounded-2xl p-4 mb-4 space-y-3">
-          <div className="flex gap-3"><input placeholder="First Name" value={profile.firstName} onChange={e => setProfile(p => ({ ...p, firstName: e.target.value }))} className="flex-1 bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
-            <input placeholder="Last Name" value={profile.lastName} onChange={e => setProfile(p => ({ ...p, lastName: e.target.value }))} className="flex-1 bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <input placeholder="First Name" value={profile.firstName} onChange={e => setProfile(p => ({ ...p, firstName: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
+            <input placeholder="Last Name" value={profile.lastName} onChange={e => setProfile(p => ({ ...p, lastName: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
+          </div>
           <input placeholder="Mobile No." value={profile.mobile} onChange={e => setProfile(p => ({ ...p, mobile: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
           <input placeholder="Email ID" value={profile.email} onChange={e => setProfile(p => ({ ...p, email: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
-          <div className="flex gap-3"><input placeholder="Hostel Block" value={profile.hostelBlock} onChange={e => setProfile(p => ({ ...p, hostelBlock: e.target.value }))} className="flex-1 bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
-            <input placeholder="Room Number" value={profile.roomNumber} onChange={e => setProfile(p => ({ ...p, roomNumber: e.target.value }))} className="w-28 bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <input placeholder="Hostel Block" value={profile.hostelBlock} onChange={e => setProfile(p => ({ ...p, hostelBlock: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
+            <input placeholder="Room Number" value={profile.roomNumber} onChange={e => setProfile(p => ({ ...p, roomNumber: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
+          </div>
         </div>
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-4">

@@ -395,21 +395,39 @@ def get_wallet():
 def add_money():
     data = request.get_json(force=True)
     amount = data.get('amount', 0)
-    if not amount or amount <= 0:
+    if not amount or amount == 0:
         return jsonify({'error': 'Invalid amount'}), 400
 
     db = get_db()
-    db.execute('UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?', (amount, g.user_id))
-    db.execute(
-        'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
-        (g.user_id, 'credit', amount, 'Added via UPI', 'upi_add')
-    )
-    db.execute(
-        'INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)',
-        (g.user_id, 'wallet_topup', f'Added ₹{amount} via UPI')
-    )
-    db.commit()
 
+    if amount > 0:
+        # Credit — UPI top-up
+        db.execute('UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?', (amount, g.user_id))
+        db.execute(
+            'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
+            (g.user_id, 'credit', amount, 'Added via UPI', 'upi_add')
+        )
+        db.execute(
+            'INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)',
+            (g.user_id, 'wallet_topup', f'Added ₹{amount} via UPI')
+        )
+    else:
+        # Debit — order payment
+        abs_amount = abs(amount)
+        user = dict_row(db.execute('SELECT wallet_balance FROM users WHERE id = ?', (g.user_id,)).fetchone())
+        if user['wallet_balance'] < abs_amount:
+            return jsonify({'error': 'Insufficient balance'}), 400
+        db.execute('UPDATE users SET wallet_balance = wallet_balance - ? WHERE id = ?', (abs_amount, g.user_id))
+        db.execute(
+            'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
+            (g.user_id, 'debit', abs_amount, 'Order payment', 'order_payment')
+        )
+        db.execute(
+            'INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)',
+            (g.user_id, 'order_payment', f'Paid ₹{abs_amount} for order')
+        )
+
+    db.commit()
     user = dict_row(db.execute('SELECT wallet_balance, bonus_coins FROM users WHERE id = ?', (g.user_id,)).fetchone())
     return jsonify({'balance': user['wallet_balance'], 'bonusCoins': user['bonus_coins']})
 
