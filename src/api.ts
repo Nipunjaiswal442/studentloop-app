@@ -52,6 +52,9 @@ export const api = {
         signUp: (email: string, password: string, fullName: string) =>
             request<AuthResponse>('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, fullName }) }),
 
+        googleAuth: (data: { email: string; displayName: string | null; uid: string; photoURL: string | null }) =>
+            request<AuthResponse>('/api/auth/google', { method: 'POST', body: JSON.stringify(data) }),
+
         me: () => request<{ user: ApiUser }>('/api/auth/me'),
     },
 

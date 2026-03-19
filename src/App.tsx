@@ -15,8 +15,6 @@ import {
 import { auth, googleProvider } from './lib/firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
-
 const CatIcon: Record<string, React.ReactNode> = {
   All: <Package size={14} />, Food: <Coffee size={14} />,
   Stationery: <Pencil size={14} />, Medicines: <Pill size={14} />,
@@ -213,21 +211,12 @@ export default function App() {
       const firebaseUser = result.user;
 
       // Send Firebase-verified user info to our backend
-      const googleRes = await fetch(`${API_BASE}/api/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          uid: firebaseUser.uid,
-          photoURL: firebaseUser.photoURL,
-        }),
+      const res = await api.auth.googleAuth({
+        email: firebaseUser.email || '',
+        displayName: firebaseUser.displayName,
+        uid: firebaseUser.uid,
+        photoURL: firebaseUser.photoURL,
       });
-      if (!googleRes.ok) {
-        const errData = await googleRes.json().catch(() => ({ error: 'Google auth failed' }));
-        throw new Error(errData.error || 'Google authentication failed');
-      }
-      const res = await googleRes.json();
       setToken(res.token);
       syncUserToProfile(res.user);
       await fetchShops();
