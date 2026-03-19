@@ -4,7 +4,7 @@ import {
   Home, Plus, Truck, User, Wallet, MapPin, Clock, Star, ChevronRight, Search,
   Package, Coffee, Pencil, Check, ArrowLeft, Navigation, Pill, ShoppingCart,
   MessageCircle, Award, Shield, TrendingUp, Heart, Send, X, Camera, Upload,
-  AlertTriangle, ChevronDown, Minus, CreditCard, History, Image,
+  AlertTriangle, Minus, CreditCard, History, Image,
   Eye, EyeOff, Mail, Lock, UserPlus, Globe
 } from 'lucide-react';
 import {
@@ -12,14 +12,16 @@ import {
   CATEGORIES, CAT_EMOJIS, SHOPS, MENU_ITEMS, DELIVERY_REQUESTS,
   SAMPLE_ORDERS, DEFAULT_PROFILE, ISSUE_TYPES, ACTIVITY, urgencyColor,
 } from './data';
+import { auth, googleProvider } from './lib/firebase';
+import { signInWithPopup, signOut } from 'firebase/auth';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const CatIcon: Record<string, React.ReactNode> = {
   All: <Package size={14} />, Food: <Coffee size={14} />,
   Stationery: <Pencil size={14} />, Medicines: <Pill size={14} />,
   Groceries: <ShoppingCart size={14} />,
 };
-import { auth, googleProvider } from './lib/firebase';
-import { signInWithPopup } from 'firebase/auth';
 export default function App() {
   /* ── Navigation ── */
   const [screen, setScreen] = useState<Screen>('onboarding');
@@ -208,28 +210,43 @@ export default function App() {
     setAuthError(''); setAuthLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      
-      const email = user.email || `${user.uid}@google.com`;
-      const demoPass = user.uid + '!A1'; // Password needs to pass validation if there is any
+      const firebaseUser = result.user;
 
-      try {
-        const res = await api.auth.signUp(email, demoPass, user.displayName || 'Google User');
-        setToken(res.token);
-        syncUserToProfile(res.user);
-      } catch {
-        const res = await api.auth.signIn(email, demoPass);
-        setToken(res.token);
-        syncUserToProfile(res.user);
+      // Send Firebase-verified user info to our backend
+      const googleRes = await fetch(`${API_BASE}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          uid: firebaseUser.uid,
+          photoURL: firebaseUser.photoURL,
+        }),
+      });
+      if (!googleRes.ok) {
+        const errData = await googleRes.json().catch(() => ({ error: 'Google auth failed' }));
+        throw new Error(errData.error || 'Google authentication failed');
       }
+      const res = await googleRes.json();
+      setToken(res.token);
+      syncUserToProfile(res.user);
+      await fetchShops();
       setTab('home'); nav('home');
     } catch (err: any) {
-      setAuthError(err.message || 'Google Sign-in failed');
+      const msg = err?.message || '';
+      if (msg.includes('unauthorized-domain')) {
+        setAuthError('This domain is not authorized in Firebase. Please add it under Firebase Console → Authentication → Settings → Authorized domains.');
+      } else if (msg.includes('popup-closed-by-user')) {
+        setAuthError('Sign-in popup was closed. Please try again.');
+      } else {
+        setAuthError(msg || 'Google Sign-in failed');
+      }
     } finally { setAuthLoading(false); }
   };
 
   /* ── Sign out ── */
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    try { await signOut(auth); } catch { /* ignore firebase signout errors */ }
     clearToken(); setDbUser(null);
     setProfile({ ...DEFAULT_PROFILE }); setPassword(''); setFullName('');
     setScreen('onboarding');

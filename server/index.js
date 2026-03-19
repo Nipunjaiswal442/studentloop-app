@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
-import { OAuth2Client } from 'google-auth-library';
 import db from './db.js';
 import dotenv from 'dotenv';
 
@@ -10,8 +9,6 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'studentloop-dev-secret-key-2026';
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
@@ -40,68 +37,40 @@ function auth(req, res, next) {
    AUTH ROUTES
    ────────────────────────────────────────── */
 
-// Google Sign-In: verify Google token → upsert user → return JWT
-// Supports both ID token (credential) and access_token flows
+// Firebase Google Sign-In: accepts pre-verified user data from frontend Firebase SDK
+// Frontend verifies with Google via Firebase, then sends user info here
 app.post('/api/auth/google', async (req, res) => {
     try {
-        const { credential, access_token } = req.body;
-        if (!credential && !access_token) return res.status(400).json({ error: 'Missing credential or access_token' });
+        const { email, displayName, uid, photoURL } = req.body;
+        if (!email || !uid) return res.status(400).json({ error: 'Missing email or uid' });
 
-        let googleId, email, name, given_name, family_name, picture;
-
-        if (credential) {
-            // Verify Google ID token (from GoogleLogin component / One Tap)
-            const ticket = await googleClient.verifyIdToken({
-                idToken: credential,
-                audience: GOOGLE_CLIENT_ID,
-            });
-            const payload = ticket.getPayload();
-            ({ sub: googleId, email, name, given_name, family_name, picture } = payload);
-        } else {
-            // Access token flow (from useGoogleLogin popup) — fetch user info from Google
-            const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${access_token}` },
-            });
-            if (!userInfoRes.ok) {
-                throw new Error('Failed to fetch Google user info');
-            }
-            const userInfo = await userInfoRes.json();
-            googleId = userInfo.sub;
-            email = userInfo.email;
-            name = userInfo.name;
-            given_name = userInfo.given_name;
-            family_name = userInfo.family_name;
-            picture = userInfo.picture;
-        }
-
-        if (!email) throw new Error('No email returned from Google');
+        const given_name = (displayName || '').split(' ')[0] || '';
+        const family_name = (displayName || '').split(' ').slice(1).join(' ') || '';
 
         // Upsert user
-        let user = db.prepare('SELECT * FROM users WHERE google_id = ?').get(googleId);
+        let user = db.prepare('SELECT * FROM users WHERE google_id = ?').get(uid);
         if (!user) {
             user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
             if (user) {
                 db.prepare('UPDATE users SET google_id = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-                    .run(googleId, picture || '', user.id);
+                    .run(uid, photoURL || '', user.id);
                 user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
             } else {
                 const result = db.prepare(
                     'INSERT INTO users (google_id, email, full_name, first_name, last_name, avatar_url) VALUES (?, ?, ?, ?, ?, ?)'
-                ).run(googleId, email, name || '', given_name || '', family_name || '', picture || '');
+                ).run(uid, email, displayName || '', given_name, family_name, photoURL || '');
                 user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
 
-                // Log activity
+                // Activity log + welcome bonus
                 db.prepare('INSERT INTO activity_log (user_id, action, details, points) VALUES (?, ?, ?, ?)')
                     .run(user.id, 'account_created', 'Signed up via Google', 100);
                 db.prepare('UPDATE users SET points = points + 100, bonus_coins = bonus_coins + 50 WHERE id = ?').run(user.id);
-
-                // Welcome bonus transaction
                 db.prepare('INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)')
                     .run(user.id, 'credit', 500, 'Welcome bonus', 'welcome');
             }
         } else {
             db.prepare('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-                .run(picture || '', user.id);
+                .run(photoURL || '', user.id);
             user = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
         }
 
@@ -112,9 +81,9 @@ app.post('/api/auth/google', async (req, res) => {
 
         // Log sign-in
         db.prepare('INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)')
-            .run(user.id, 'sign_in', 'Signed in via Google');
+            .run(user.id, 'sign_in', 'Signed in via Google (Firebase)');
 
-        res.json({ token, user: sanitizeUser(user) });
+        res.json({ token, user: sanitizeUser(db.prepare('SELECT * FROM users WHERE id = ?').get(user.id)) });
     } catch (err) {
         console.error('Google auth error:', err.message);
         res.status(401).json({ error: 'Google authentication failed' });
@@ -429,5 +398,5 @@ function sanitizeUser(user) {
 app.listen(PORT, () => {
     console.log(`🚀 StudentLoop API running on http://localhost:${PORT}`);
     console.log(`📦 Database: ${db.name}`);
-    console.log(`🔐 Google Client ID: ${GOOGLE_CLIENT_ID ? 'Configured' : '⚠️  Not set — add GOOGLE_CLIENT_ID to .env'}`);
+    console.log(`🔐 Auth: Firebase Google + Email/Password`);
 });
