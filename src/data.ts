@@ -1,6 +1,6 @@
 /* ── TYPES ── */
 export type Screen =
-    | 'onboarding' | 'home' | 'post' | 'accept' | 'tracking' | 'profile'
+    | 'landing' | 'onboarding' | 'home' | 'post' | 'accept' | 'tracking' | 'profile'
     | 'wallet' | 'shop' | 'cart' | 'orderSummary' | 'orderTracking'
     | 'deliveryDashboard' | 'deliveryAccepted' | 'uploadBill' | 'otpConfirm'
     | 'orderHistory' | 'reportIssue' | 'addShop';

@@ -5,7 +5,8 @@ import {
   Package, Coffee, Pencil, Check, ArrowLeft, Navigation, Pill, ShoppingCart,
   MessageCircle, Award, Shield, TrendingUp, Heart, Send, X, Camera, Upload,
   AlertTriangle, Minus, CreditCard, History, Image,
-  Eye, EyeOff, Mail, Lock, UserPlus, Globe
+  Eye, EyeOff, Mail, Lock, UserPlus, Globe,
+  Rocket, Zap, ShieldCheck
 } from 'lucide-react';
 import {
   type Screen, type Tab, type CartItem, type Order, type Profile, type Shop, type MenuItem,
@@ -22,7 +23,7 @@ const CatIcon: Record<string, React.ReactNode> = {
 };
 export default function App() {
   /* ── Navigation ── */
-  const [screen, setScreen] = useState<Screen>('onboarding');
+  const [screen, setScreen] = useState<Screen>('landing');
   const [prevScreen, setPrevScreen] = useState<Screen>('home');
   const [tab, setTab] = useState<Tab>('home');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -162,7 +163,7 @@ export default function App() {
     if (token) {
       fetchShops();
       api.auth.me()
-        .then(({ user }) => { syncUserToProfile(user); setTab('home'); setScreen('home'); })
+        .then(({ user }) => { syncUserToProfile(user); setTab('home'); })
         .catch(() => { clearToken(); });
     }
   }, [syncUserToProfile, fetchShops]);
@@ -264,6 +265,64 @@ export default function App() {
   const BackBtn = ({ to }: { to?: Screen }) => (
     <button onClick={() => nav(to || prevScreen)} className="text-muted-foreground hover:text-foreground"><ArrowLeft size={22} /></button>
   );
+
+  /* ═══════ LANDING PAGE ═══════ */
+  if (screen === 'landing') {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center animate-fade-in relative overflow-hidden">
+        {/* Background effects */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-background to-background" />
+        <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animate-pulse-glow" />
+        <div className="absolute bottom-1/4 -right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[100px] animate-pulse-glow" />
+
+        <div className="relative z-10 max-w-2xl mx-auto space-y-8 flex flex-col items-center">
+          {/* Logo animation */}
+          <div className="w-20 h-20 rounded-2xl gradient-purple flex items-center justify-center mb-4 animate-bounce-soft shadow-[0_0_30px_rgba(168,85,247,0.4)]">
+            <Package size={40} className="text-white" />
+          </div>
+
+          <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight animate-slide-up" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
+            <span className="text-white">Student</span>
+            <span className="gradient-text">Loop</span>
+          </h1>
+
+          <p className="text-lg md:text-xl text-muted-foreground animate-slide-up leading-relaxed" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
+            The ultimate campus ecosystem. Order late-night meals, get medicines, 
+            or earn money delivering to your peers—all within your college network.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full pt-4 animate-slide-up" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
+            {[
+              { icon: Zap, title: "Super Fast", desc: "Peer-to-peer delivery means your cravings arrive in minutes." },
+              { icon: Wallet, title: "Earn Money", desc: "Turn your free time into cash by helping out fellow students." },
+              { icon: ShieldCheck, title: "100% Secure", desc: "Verified campus email required. Safe & trusted network." }
+            ].map((feature, i) => (
+              <div key={i} className="glass-card p-5 rounded-2xl flex flex-col items-center text-center hover:-translate-y-1 transition duration-300">
+                <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center mb-3 text-purple-400">
+                  <feature.icon size={24} />
+                </div>
+                <h3 className="font-semibold text-white mb-1">{feature.title}</h3>
+                <p className="text-xs text-muted-foreground">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="pt-8 animate-slide-up w-full flex justify-center" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
+            <button
+              onClick={() => nav(dbUser ? 'home' : 'onboarding')}
+              className="relative group overflow-hidden rounded-full p-[2px] transition-transform hover:scale-105 active:scale-95"
+            >
+              <span className="absolute inset-0 bg-gradient-to-r from-purple-600 via-purple-300 to-purple-600 rounded-full animate-shimmer" style={{ backgroundSize: '200% auto' }} />
+              <div className="relative bg-[#08070b] group-hover:bg-[#110e18] transition-colors duration-300 rounded-full px-8 py-4 flex items-center gap-3">
+                <span className="text-lg font-bold text-white tracking-wide">OPEN WEBSITE</span>
+                <Rocket size={20} className="text-purple-400 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   /* ═══════ AUTH — SPRAKE-INSPIRED SPLIT SCREEN ═══════ */
   if (screen === 'onboarding') {
