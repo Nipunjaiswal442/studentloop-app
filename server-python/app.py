@@ -256,6 +256,85 @@ def auth_me():
     return jsonify({'user': sanitize_user(dict_row(row))})
 
 
+@app.route('/api/auth/google', methods=['POST'])
+def google_auth():
+    """Firebase Google Sign-In: accepts pre-verified user data from frontend Firebase SDK."""
+    data = request.get_json(force=True)
+    email = (data.get('email') or '').strip().lower()
+    display_name = data.get('displayName') or ''
+    uid = data.get('uid') or ''
+    photo_url = data.get('photoURL') or ''
+
+    if not email or not uid:
+        return jsonify({'error': 'Missing email or uid'}), 400
+
+    name_parts = display_name.split(' ', 1)
+    first_name = name_parts[0] if name_parts else ''
+    last_name = name_parts[1] if len(name_parts) > 1 else ''
+
+    db = get_db()
+
+    # Check if user exists by Google UID
+    row = db.execute('SELECT * FROM users WHERE google_id = ?', (uid,)).fetchone()
+
+    if not row:
+        # Check by email
+        row = db.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+        if row:
+            # Link Google account to existing email user
+            user = dict_row(row)
+            db.execute(
+                'UPDATE users SET google_id = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                (uid, photo_url, user['id'])
+            )
+            db.commit()
+            user = dict_row(db.execute('SELECT * FROM users WHERE id = ?', (user['id'],)).fetchone())
+        else:
+            # Create new user
+            cur = db.execute(
+                'INSERT INTO users (google_id, email, full_name, first_name, last_name, avatar_url) VALUES (?, ?, ?, ?, ?, ?)',
+                (uid, email, display_name, first_name, last_name, photo_url)
+            )
+            user_id = cur.lastrowid
+            db.commit()
+
+            # Welcome bonus + activity
+            db.execute(
+                'INSERT INTO activity_log (user_id, action, details, points) VALUES (?, ?, ?, ?)',
+                (user_id, 'account_created', 'Signed up via Google', 100)
+            )
+            db.execute('UPDATE users SET points = points + 100, bonus_coins = bonus_coins + 50 WHERE id = ?', (user_id,))
+            db.execute(
+                'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
+                (user_id, 'credit', 500, 'Welcome bonus', 'welcome')
+            )
+            db.commit()
+            user = dict_row(db.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone())
+    else:
+        user = dict_row(row)
+        # Update avatar
+        db.execute(
+            'UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            (photo_url, user['id'])
+        )
+        db.commit()
+        user = dict_row(db.execute('SELECT * FROM users WHERE id = ?', (user['id'],)).fetchone())
+
+    # Create session
+    token = sign_token(user['id'])
+    db.execute(
+        'INSERT INTO sessions (user_id, token, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?)',
+        (user['id'], token, request.remote_addr or '', request.headers.get('User-Agent', ''), session_expiry())
+    )
+    db.execute(
+        'INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)',
+        (user['id'], 'sign_in', 'Signed in via Google (Firebase)')
+    )
+    db.commit()
+
+    return jsonify({'token': token, 'user': sanitize_user(user)})
+
+
 # ═══════════════════════════════════════════
 #  USER PROFILE
 # ═══════════════════════════════════════════
