@@ -793,7 +793,7 @@ def chat_gemini():
     if not message:
         return jsonify({'error': 'Message is required'}), 400
 
-    # System prompt for StudentLoop context
+    # System prompt for StudentLoop context with FAQ injected
     system_prompt = (
         "You are the StudentLoop AI Assistant. StudentLoop is a peer-to-peer campus delivery platform "
         "where students help each other by delivering food, stationery, medicines, and groceries within "
@@ -801,12 +801,20 @@ def chat_gemini():
         "general campus life tips. You are specifically trained to identify, prevent, and help users "
         "with all types of scam cases (e.g., fake delivery requests, payment fraud, phishing attempts "
         "on campus). Always prioritize user safety and advise them to report suspicious activity "
-        "immediately. Be concise, friendly, and helpful. Keep answers under 3 sentences unless the "
-        "user asks for more detail regarding a scam report or safety issue."
+        "immediately. Be concise, friendly, and helpful.\n\n"
+        "Here are the rules and FAQ of the platform you must know:\n"
+        "- Welcome bonus: ₹500 is credited on sign-up.\n"
+        "- Wallet & Payments: Users add money via UPI. Payments can decline if balance is insufficient. "
+        "Bonus coins are earned automatically (5% of order amount).\n"
+        "- Orders & Delivery: Users browse shops, add to cart, and set tip. The total is deducted and "
+        "a request appears on the Dashboard. A 4-digit OTP ensures safe delivery.\n"
+        "- Trust Score: Reflects reliability. Increases with successful deliveries and good ratings.\n"
+        "- Delivering: Anyone can go to the Deliver tab, accept requests, and earn the base reward plus tip.\n"
+        "Keep answers under 3 sentences unless the user asks for more detail."
     )
 
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         payload = {
             "contents": [
                 {"role": "user", "parts": [{"text": f"{system_prompt}\n\nUser question: {message}"}]}
@@ -835,6 +843,10 @@ def chat_gemini():
 
     except http_requests.exceptions.Timeout:
         return jsonify({'error': 'AI service timed out. Please try again.'}), 504
+    except http_requests.exceptions.HTTPError as e:
+        err_msg = e.response.text if hasattr(e, 'response') and e.response else str(e)
+        print(f"Gemini API HTTP error: {err_msg}")
+        return jsonify({'error': f'AI service HTTP Error: {e.response.status_code if e.response else 500}'}), 502
     except Exception as e:
         print(f"Gemini API error: {e}")
         return jsonify({'error': 'AI service unavailable. Please try the FAQ instead.'}), 502
