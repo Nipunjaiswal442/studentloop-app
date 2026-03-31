@@ -841,12 +841,26 @@ def chat_gemini():
 
         return jsonify({'reply': reply})
 
-    except http_requests.exceptions.Timeout:
-        return jsonify({'error': 'AI service timed out. Please try again.'}), 504
     except http_requests.exceptions.HTTPError as e:
-        err_msg = e.response.text if hasattr(e, 'response') and e.response else str(e)
-        print(f"Gemini API HTTP error: {err_msg}")
-        return jsonify({'error': f'AI service HTTP Error: {e.response.status_code if e.response else 500}'}), 502
+        err_msg = ""
+        status_code = 500
+        if e.response is not None:
+            err_msg = e.response.text
+            status_code = e.response.status_code
+        else:
+            err_msg = str(e)
+            
+        # Try to parse Google's JSON error if possible
+        display_msg = "Unknown Error"
+        try:
+            err_data = result = e.response.json()
+            if 'error' in err_data and 'message' in err_data['error']:
+                display_msg = err_data['error']['message']
+        except:
+            display_msg = err_msg or str(e)
+
+        print(f"Gemini API HTTP {status_code}: {err_msg}")
+        return jsonify({'error': f'Google API Error ({status_code}): {display_msg}'}), 502
     except Exception as e:
         print(f"Gemini API error: {e}")
         return jsonify({'error': 'AI service unavailable. Please try the FAQ instead.'}), 502
