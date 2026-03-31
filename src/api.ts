@@ -84,6 +84,8 @@ export const api = {
             request<{ delivery: ApiDeliveryRequest; balance: number; bonusCoins: number }>('/api/deliveries', { method: 'POST', body: JSON.stringify(data) }),
         accept: (id: number) => request<{ success: boolean }>(`/api/deliveries/${id}/accept`, { method: 'POST' }),
         complete: (id: number) => request<{ success: boolean; earned: number; user: ApiUser }>(`/api/deliveries/${id}/complete`, { method: 'POST' }),
+        createFromOrder: (data: { title: string; category: string; pickup: string; dropLocation: string; reward: number; tip: number; deadline: string; urgency: string; items: string[] }) =>
+            request<{ delivery: ApiDeliveryRequest }>('/api/deliveries/from-order', { method: 'POST', body: JSON.stringify(data) }),
     },
 
     disputes: {
@@ -93,6 +95,11 @@ export const api = {
 
     activity: {
         list: () => request<{ activity: any[] }>('/api/activity'),
+    },
+
+    chat: {
+        gemini: (message: string) =>
+            request<{ reply: string }>('/api/chat/gemini', { method: 'POST', body: JSON.stringify({ message }) }),
     },
 
     shops: {

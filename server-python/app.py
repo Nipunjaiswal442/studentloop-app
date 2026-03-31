@@ -12,6 +12,7 @@ import time
 import math
 import random
 import functools
+import requests as http_requests
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -23,6 +24,8 @@ from dotenv import load_dotenv
 from db import get_db, init_db, dict_row, dict_rows, close_db
 
 # ── Load env ──
+# Load from server-python/.env first (has GEMINI_API_KEY), then parent .env
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
 
 app = Flask(__name__)
@@ -395,6 +398,12 @@ def create_order():
     order_code = f"ORD-{str(int(time.time() * 1000))[-6:]}"
 
     db = get_db()
+
+    # Check wallet balance before proceeding
+    user = dict_row(db.execute('SELECT wallet_balance FROM users WHERE id = ?', (g.user_id,)).fetchone())
+    if user['wallet_balance'] < total:
+        return jsonify({'error': f"Insufficient wallet balance. Need ₹{total}, have ₹{user['wallet_balance']}"}), 400
+
     cur = db.execute(
         'INSERT INTO orders (order_code, user_id, shop_id, shop_name, total, tip, hostel, room, otp, delivery_reward) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         (order_code, g.user_id, shop_id, shop_name, total, tip, hostel, room, otp, 30 + tip)
@@ -584,6 +593,39 @@ def create_delivery():
     })
 
 
+@app.route('/api/deliveries/from-order', methods=['POST'])
+@auth_required
+def create_delivery_from_order():
+    """Create a delivery request WITHOUT debiting wallet (used after order already debited)."""
+    data = request.get_json(force=True)
+    title = data.get('title', '')
+    category = data.get('category', 'Food')
+    pickup = data.get('pickup', '')
+    drop_location = data.get('dropLocation', '')
+    reward_amt = int(data.get('reward', 30) or 30)
+    tip_amt = int(data.get('tip', 0) or 0)
+    deadline = data.get('deadline', '30 min')
+    urgency = data.get('urgency', 'medium')
+    items = data.get('items', [])
+
+    db = get_db()
+
+    cur = db.execute(
+        'INSERT INTO delivery_requests (user_id, title, category, pickup, drop_location, reward, tip, deadline, urgency, items_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        (g.user_id, title, category, pickup, drop_location, reward_amt, tip_amt, deadline, urgency, json.dumps(items))
+    )
+    dr_id = cur.lastrowid
+    db.commit()
+
+    dr = dict_row(db.execute("""
+        SELECT dr.*, u.first_name || ' ' || u.last_name as requester_name
+        FROM delivery_requests dr JOIN users u ON dr.user_id = u.id
+        WHERE dr.id = ?
+    """, (dr_id,)).fetchone())
+
+    return jsonify({'delivery': enrich_delivery(dr)})
+
+
 @app.route('/api/deliveries/<int:dr_id>/accept', methods=['POST'])
 @auth_required
 def accept_delivery(dr_id):
@@ -731,6 +773,68 @@ def create_shop():
     shop['menu'] = dict_rows(db.execute('SELECT * FROM menu_items WHERE shop_id = ?', (shop_id,)).fetchall())
     
     return jsonify({'shop': shop})
+
+
+# ═════════════════════════════════════════════
+#  GEMINI AI CHAT
+# ═════════════════════════════════════════════
+
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+
+@app.route('/api/chat/gemini', methods=['POST'])
+@auth_required
+def chat_gemini():
+    """Proxy chat requests to Google Gemini API."""
+    if not GEMINI_API_KEY:
+        return jsonify({'error': 'Gemini API key not configured'}), 500
+
+    data = request.get_json(force=True)
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'error': 'Message is required'}), 400
+
+    # System prompt for StudentLoop context
+    system_prompt = (
+        "You are the StudentLoop AI Assistant. StudentLoop is a peer-to-peer campus delivery platform "
+        "where students help each other by delivering food, stationery, medicines, and groceries within "
+        "their college campus. You help users with questions about the platform, troubleshooting, and "
+        "general campus life tips. Be concise, friendly, and helpful. Keep answers under 3 sentences "
+        "unless the user asks for more detail."
+    )
+
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        payload = {
+            "contents": [
+                {"role": "user", "parts": [{"text": f"{system_prompt}\n\nUser question: {message}"}]}
+            ],
+            "generationConfig": {
+                "maxOutputTokens": 256,
+                "temperature": 0.7,
+            }
+        }
+        resp = http_requests.post(url, json=payload, timeout=15)
+        resp.raise_for_status()
+        result = resp.json()
+
+        # Extract text from Gemini response
+        reply = ''
+        candidates = result.get('candidates', [])
+        if candidates:
+            parts = candidates[0].get('content', {}).get('parts', [])
+            if parts:
+                reply = parts[0].get('text', '')
+
+        if not reply:
+            reply = "I'm sorry, I couldn't generate a response. Please try again."
+
+        return jsonify({'reply': reply})
+
+    except http_requests.exceptions.Timeout:
+        return jsonify({'error': 'AI service timed out. Please try again.'}), 504
+    except Exception as e:
+        print(f"Gemini API error: {e}")
+        return jsonify({'error': 'AI service unavailable. Please try the FAQ instead.'}), 502
 
 
 # ═══════════════════════════════════════════

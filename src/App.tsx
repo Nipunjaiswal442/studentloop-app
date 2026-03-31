@@ -6,12 +6,13 @@ import {
   MessageCircle, Award, Shield, TrendingUp, Heart, Send, X, Camera, Upload,
   AlertTriangle, Minus, CreditCard, History, Image,
   Eye, EyeOff, Mail, Lock, UserPlus, Globe,
-  Rocket, Zap, ShieldCheck
+  HelpCircle, CheckSquare
 } from 'lucide-react';
 import {
   type Screen, type Tab, type CartItem, type Order, type Profile, type Shop, type MenuItem,
   CATEGORIES, CAT_EMOJIS, SHOPS, MENU_ITEMS, DELIVERY_REQUESTS,
   SAMPLE_ORDERS, DEFAULT_PROFILE, ISSUE_TYPES, ACTIVITY, urgencyColor,
+  CHATBOT_FAQ, TERMS_AND_CONDITIONS,
 } from './data';
 import { auth, googleProvider } from './lib/firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
@@ -85,6 +86,16 @@ export default function App() {
   const [postItems, setPostItems] = useState('');
   const [postLoading, setPostLoading] = useState(false);
   const [postError, setPostError] = useState('');
+
+  /* ── Chatbot state ── */
+  const [chatCategory, setChatCategory] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'bot'; text: string }[]>([]);
+  const [aiInput, setAiInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+
+  /* ── Terms & Conditions ── */
+  const [termsAccepted, setTermsAccepted] = useState(() => localStorage.getItem('sl_terms_accepted') === 'true');
+  const [termsCheckbox, setTermsCheckbox] = useState(false);
 
   /* ── Fetch deliveries from API ── */
   const fetchDeliveries = useCallback(async () => {
@@ -163,7 +174,7 @@ export default function App() {
     if (token) {
       fetchShops();
       api.auth.me()
-        .then(({ user }) => { syncUserToProfile(user); setTab('home'); })
+        .then(({ user }) => { syncUserToProfile(user); fetchWallet(); setTab('home'); })
         .catch(() => { clearToken(); });
     }
   }, [syncUserToProfile, fetchShops]);
@@ -178,6 +189,7 @@ export default function App() {
       setToken(res.token);
       syncUserToProfile(res.user);
       await fetchShops();
+      await fetchWallet();
       setTab('home'); nav('home');
     } catch (err: any) {
       setAuthError(err.message || 'Authentication failed');
@@ -221,6 +233,7 @@ export default function App() {
       setToken(res.token);
       syncUserToProfile(res.user);
       await fetchShops();
+      await fetchWallet();
       setTab('home'); nav('home');
     } catch (err: any) {
       const msg = err?.message || '';
@@ -267,59 +280,57 @@ export default function App() {
   );
 
   /* ═══════ LANDING PAGE ═══════ */
+  // Listen for postMessage from landing.html iframe
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data === 'sl-get-started') {
+        if (termsAccepted) {
+          nav(dbUser ? 'home' : 'onboarding');
+        }
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [termsAccepted, dbUser]);
+
   if (screen === 'landing') {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center animate-fade-in relative overflow-hidden">
-        {/* Background effects */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-background to-background" />
-        <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animate-pulse-glow" />
-        <div className="absolute bottom-1/4 -right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[100px] animate-pulse-glow" />
+      <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+        {/* Full-screen landing page iframe */}
+        <iframe
+          src="/landing.html"
+          className="w-full flex-1 border-0"
+          style={{ minHeight: '100vh' }}
+          title="StudentLoop Landing Page"
+        />
 
-        <div className="relative z-10 max-w-2xl mx-auto space-y-8 flex flex-col items-center">
-          {/* Logo animation */}
-          <div className="w-20 h-20 rounded-2xl gradient-purple flex items-center justify-center mb-4 animate-bounce-soft shadow-[0_0_30px_rgba(168,85,247,0.4)]">
-            <Package size={40} className="text-white" />
-          </div>
-
-          <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight animate-slide-up" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
-            <span className="text-white">Student</span>
-            <span className="gradient-text">Loop</span>
-          </h1>
-
-          <p className="text-lg md:text-xl text-muted-foreground animate-slide-up leading-relaxed" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
-            The ultimate campus ecosystem. Order late-night meals, get medicines, 
-            or earn money delivering to your peers—all within your college network.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full pt-4 animate-slide-up" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
-            {[
-              { icon: Zap, title: "Super Fast", desc: "Peer-to-peer delivery means your cravings arrive in minutes." },
-              { icon: Wallet, title: "Earn Money", desc: "Turn your free time into cash by helping out fellow students." },
-              { icon: ShieldCheck, title: "100% Secure", desc: "Verified campus email required. Safe & trusted network." }
-            ].map((feature, i) => (
-              <div key={i} className="glass-card p-5 rounded-2xl flex flex-col items-center text-center hover:-translate-y-1 transition duration-300">
-                <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center mb-3 text-purple-400">
-                  <feature.icon size={24} />
+        {/* T&C overlay at bottom */}
+        {!termsAccepted && (
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#09090b]/95 backdrop-blur-xl border-t border-purple-500/20 p-4 animate-slide-up">
+            <div className="max-w-lg mx-auto">
+              <div className="glass-card rounded-2xl p-3 text-left max-h-32 overflow-y-auto mb-3 border border-purple-500/20 text-xs text-gray-400 leading-relaxed whitespace-pre-line">
+                {TERMS_AND_CONDITIONS}
+              </div>
+              <label className="flex items-center gap-3 cursor-pointer mb-3" onClick={() => setTermsCheckbox(!termsCheckbox)}>
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0 ${termsCheckbox ? 'bg-purple-600 border-purple-600' : 'border-gray-500'}`}>
+                  {termsCheckbox && <Check size={14} className="text-white" />}
                 </div>
-                <h3 className="font-semibold text-white mb-1">{feature.title}</h3>
-                <p className="text-xs text-muted-foreground">{feature.desc}</p>
-              </div>
-            ))}
+                <span className="text-sm text-gray-300">I agree to the <span className="text-purple-400 font-semibold">Terms & Conditions</span></span>
+              </label>
+              <button
+                onClick={() => {
+                  localStorage.setItem('sl_terms_accepted', 'true');
+                  setTermsAccepted(true);
+                  nav(dbUser ? 'home' : 'onboarding');
+                }}
+                disabled={!termsCheckbox}
+                className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${termsCheckbox ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg shadow-purple-500/25 hover:opacity-90' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}
+              >
+                Accept & Continue
+              </button>
+            </div>
           </div>
-
-          <div className="pt-8 animate-slide-up w-full flex justify-center" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
-            <button
-              onClick={() => nav(dbUser ? 'home' : 'onboarding')}
-              className="relative group overflow-hidden rounded-full p-[2px] transition-transform hover:scale-105 active:scale-95"
-            >
-              <span className="absolute inset-0 bg-gradient-to-r from-purple-600 via-purple-300 to-purple-600 rounded-full animate-shimmer" style={{ backgroundSize: '200% auto' }} />
-              <div className="relative bg-[#08070b] group-hover:bg-[#110e18] transition-colors duration-300 rounded-full px-8 py-4 flex items-center gap-3">
-                <span className="text-lg font-bold text-white tracking-wide">OPEN WEBSITE</span>
-                <Rocket size={20} className="text-purple-400 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-              </div>
-            </button>
-          </div>
-        </div>
+        )}
       </div>
     );
   }
@@ -572,9 +583,9 @@ export default function App() {
                 shopId: shop.id, shopName: shop.name, total, tip,
                 hostel: profile.hostelBlock || 'Hostel 7', room: profile.roomNumber || '312'
               });
-              // Also create a delivery request so it shows up in the delivery dashboard for others
+              // Create delivery request WITHOUT debiting wallet again (order already debited)
               const itemNames = cart.map(c => `${c.name} x${c.qty}`);
-              await api.deliveries.create({
+              await api.deliveries.createFromOrder({
                 title: cart.map(c => c.name).join(' + '),
                 category: shop.category || 'Food',
                 pickup: shop.name,
@@ -589,11 +600,15 @@ export default function App() {
               const walletRes = await api.wallet.get();
               setWalletBalance(walletRes.balance);
               setBonusCoins(walletRes.bonusCoins);
-            } catch {
-              // Fallback: debit locally if API fails
-              setWalletBalance(b => b - total);
+              setWalletTxns(walletRes.transactions);
+            } catch (err: any) {
+              // If API fails, the order wasn't placed — do NOT debit locally
+              alert(err?.message || 'Order failed. Please try again.');
+              setOrders(o => o.filter(x => x.id !== ord.id));
+              setActiveOrder(null);
+              return;
             }
-            setBonusCoins(c => c + Math.floor(total * 0.05)); setCart([]); nav('orderTracking');
+            setCart([]); nav('orderTracking');
           }} className="w-full py-4 rounded-2xl gradient-purple text-white font-bold disabled:opacity-40 glow-purple flex items-center justify-center gap-2">
             <CreditCard size={18} /> Confirm Order — ₹{total}
           </button>
@@ -636,7 +651,7 @@ export default function App() {
           })}
         </div>
         <div className="px-5 flex gap-3">
-          <button className="flex-1 py-3.5 rounded-2xl bg-card border border-border text-sm font-semibold flex items-center justify-center gap-2 text-muted-foreground"><MessageCircle size={16} />Message</button>
+          <button onClick={() => { setChatCategory(null); setChatMessages([]); nav('chatbot'); }} className="flex-1 py-3.5 rounded-2xl bg-card border border-border text-sm font-semibold flex items-center justify-center gap-2 text-muted-foreground"><MessageCircle size={16} />Message</button>
           {trackStep < 4 ? (
             <button onClick={() => setTrackStep(s => s + 1)} className="flex-1 py-3.5 rounded-2xl gradient-purple text-white text-sm font-semibold flex items-center justify-center gap-2 glow-purple">Next Step <ChevronRight size={16} /></button>
           ) : (
@@ -654,6 +669,11 @@ export default function App() {
       setPostError('Please fill in all required fields');
       return;
     }
+    const postCost = (Number(postReward) || 30) + (Number(postTip) || 0);
+    if (walletBalance < postCost) {
+      setPostError(`Insufficient wallet balance. Need ₹${postCost}, have ₹${walletBalance}. Please add money first.`);
+      return;
+    }
     setPostError(''); setPostLoading(true);
     try {
       const itemsList = postItems.trim() ? postItems.split(',').map(s => s.trim()).filter(Boolean) : [postTitle];
@@ -669,7 +689,7 @@ export default function App() {
       // Add to live deliveries
       setLiveDeliveries(prev => [res.delivery, ...prev]);
       // Capture the deducted amount before resetting form
-      setPostDeductedAmt((Number(postReward) || 30) + (Number(postTip) || 0));
+      setPostDeductedAmt(postCost);
       // Reset form
       setPostTitle(''); setPostPickup(''); setPostDrop(''); setPostReward('30');
       setPostTip('0'); setPostDeadline('30 min'); setPostItems('');
@@ -1074,6 +1094,137 @@ export default function App() {
     </div>
   );
 
+  /* ═══════ CHATBOT HELP DESK ═══════ */
+  const handleAiSend = async () => {
+    const q = aiInput.trim();
+    if (!q || aiLoading) return;
+    setChatMessages(prev => [...prev, { role: 'user', text: q }]);
+    setAiInput(''); setAiLoading(true);
+    try {
+      const res = await api.chat.gemini(q);
+      setChatMessages(prev => [...prev, { role: 'bot', text: res.reply }]);
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, { role: 'bot', text: err.message || 'AI is unavailable right now. Try the FAQ instead.' }]);
+    } finally { setAiLoading(false); }
+  };
+
+  if (screen === 'chatbot') return (
+    <div className="min-h-screen max-w-md mx-auto pb-24 animate-fade-in">
+      <div className="px-5 pt-6 pb-3 flex items-center gap-3">
+        <BackBtn />
+        <h1 className="text-lg font-bold">Help Desk</h1>
+        <span className="ml-auto text-xs text-purple-400 flex items-center gap-1"><HelpCircle size={14} />FAQ & AI</span>
+      </div>
+      <div className="px-5">
+        {/* Chat messages */}
+        <div className="space-y-3 mb-4 max-h-[50vh] overflow-y-auto">
+          {chatMessages.length === 0 && (
+            <div className="glass-card rounded-2xl p-4 text-center">
+              <div className="w-14 h-14 rounded-full gradient-purple flex items-center justify-center mx-auto mb-3"><MessageCircle size={28} className="text-white" /></div>
+              <h3 className="font-bold mb-1">Hi there! 👋</h3>
+              <p className="text-xs text-muted-foreground">Choose a FAQ category for instant answers, or ask the AI Assistant anything!</p>
+            </div>
+          )}
+          {chatMessages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
+                msg.role === 'user'
+                  ? 'gradient-purple text-white rounded-br-sm'
+                  : 'glass-card text-foreground rounded-bl-sm'
+              }`}>
+                {msg.text}
+              </div>
+            </div>
+          ))}
+          {aiLoading && (
+            <div className="flex justify-start">
+              <div className="glass-card rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" style={{ animationDelay: '0.2s' }} />
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" style={{ animationDelay: '0.4s' }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* AI Assistant input — always visible */}
+        {chatCategory === '__ai__' && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <button onClick={() => setChatCategory(null)} className="text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /></button>
+              <p className="text-xs font-medium text-muted-foreground">Ask <span className="text-purple-400">AI Assistant</span> anything:</p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={aiInput}
+                onChange={e => setAiInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAiSend()}
+                placeholder="Type your question..."
+                className="flex-1 bg-card border border-border rounded-xl px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                disabled={aiLoading}
+              />
+              <button onClick={handleAiSend} disabled={!aiInput.trim() || aiLoading}
+                className="w-12 h-12 rounded-xl gradient-purple flex items-center justify-center text-white disabled:opacity-40 glow-purple shrink-0">
+                <Send size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Category selection */}
+        {!chatCategory && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Select a topic:</p>
+            {/* AI Assistant option */}
+            <button onClick={() => setChatCategory('__ai__')}
+              className="w-full glass-card rounded-2xl p-3.5 flex items-center gap-3 hover:border-purple-500/40 transition text-left border border-purple-500/20 bg-purple-500/5">
+              <span className="text-xl">✨</span>
+              <div className="flex-1">
+                <span className="text-sm font-semibold block">Ask AI Assistant</span>
+                <span className="text-[10px] text-muted-foreground">Powered by Gemini — ask anything!</span>
+              </div>
+              <ChevronRight size={16} className="text-purple-400" />
+            </button>
+            {CHATBOT_FAQ.map(cat => (
+              <button key={cat.category} onClick={() => setChatCategory(cat.category)}
+                className="w-full glass-card rounded-2xl p-3.5 flex items-center gap-3 hover:border-purple-500/40 transition text-left">
+                <span className="text-xl">{cat.icon}</span>
+                <span className="text-sm font-semibold flex-1">{cat.category}</span>
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Questions for selected FAQ category */}
+        {chatCategory && chatCategory !== '__ai__' && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <button onClick={() => setChatCategory(null)} className="text-muted-foreground hover:text-foreground"><ArrowLeft size={16} /></button>
+              <p className="text-xs font-medium text-muted-foreground">Questions about <span className="text-purple-400">{chatCategory}</span>:</p>
+            </div>
+            {CHATBOT_FAQ.find(c => c.category === chatCategory)?.questions.map((faq, i) => (
+              <button key={i} onClick={() => {
+                setChatMessages(prev => [
+                  ...prev,
+                  { role: 'user', text: faq.q },
+                  { role: 'bot', text: faq.a },
+                ]);
+              }}
+                className="w-full glass-card rounded-2xl p-3.5 text-left hover:border-purple-500/40 transition">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <CheckSquare size={14} className="text-purple-400 shrink-0" />
+                  {faq.q}
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <BottomNav />
+    </div>
+  );
+
   /* ═══════ PROFILE ═══════ */
   return (
     <div className="min-h-screen max-w-md mx-auto pb-24 animate-fade-in">
@@ -1112,6 +1263,9 @@ export default function App() {
         {/* Actions */}
         <button onClick={() => nav('orderHistory')} className="w-full glass-card rounded-2xl p-4 mb-3 flex items-center gap-3 hover:border-purple-500/40 transition">
           <History size={18} className="text-purple-400" /><span className="text-sm font-medium flex-1 text-left">Order History</span><ChevronRight size={16} className="text-muted-foreground" />
+        </button>
+        <button onClick={() => { setChatCategory(null); setChatMessages([]); nav('chatbot'); }} className="w-full glass-card rounded-2xl p-4 mb-3 flex items-center gap-3 hover:border-purple-500/40 transition">
+          <HelpCircle size={18} className="text-purple-400" /><span className="text-sm font-medium flex-1 text-left">Help Desk</span><ChevronRight size={16} className="text-muted-foreground" />
         </button>
         <button onClick={handleSignOut} className="w-full glass-card rounded-2xl p-4 mb-3 flex items-center gap-3 hover:border-red-500/40 border-red-500/20 transition">
           <ArrowLeft size={18} className="text-red-400" /><span className="text-sm font-medium flex-1 text-left text-red-400">Sign Out</span>

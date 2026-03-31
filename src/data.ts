@@ -3,7 +3,7 @@ export type Screen =
     | 'landing' | 'onboarding' | 'home' | 'post' | 'accept' | 'tracking' | 'profile'
     | 'wallet' | 'shop' | 'cart' | 'orderSummary' | 'orderTracking'
     | 'deliveryDashboard' | 'deliveryAccepted' | 'uploadBill' | 'otpConfirm'
-    | 'orderHistory' | 'reportIssue' | 'addShop';
+    | 'orderHistory' | 'reportIssue' | 'addShop' | 'chatbot' | 'terms';
 
 export type Tab = 'home' | 'post' | 'deliveries' | 'wallet' | 'profile';
 
@@ -117,3 +117,107 @@ export const urgencyColor = (u: string) =>
     u === 'high' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
         u === 'medium' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
             'bg-green-500/20 text-green-400 border-green-500/30';
+
+/* ── CHATBOT FAQ ── */
+export interface ChatFAQ {
+    category: string;
+    icon: string;
+    questions: { q: string; a: string }[];
+}
+
+export const CHATBOT_FAQ: ChatFAQ[] = [
+    {
+        category: 'Account', icon: '👤',
+        questions: [
+            { q: 'How do I create an account?', a: 'Sign up using your college email and a password. You can also use Google Sign-In for quick access. A welcome bonus of ₹500 is credited to your wallet on sign-up.' },
+            { q: 'How do I reset my password?', a: 'Currently, please contact support at support@studentloop.com to reset your password. We are working on adding an in-app password reset feature.' },
+            { q: 'Can I change my email?', a: 'Your email is linked to your college identity and cannot be changed. If you need help, contact support.' },
+            { q: 'What is Trust Score?', a: 'Trust Score reflects your reliability on the platform. It increases with successful deliveries, positive ratings, and timely completions. Higher scores get priority matching.' },
+        ]
+    },
+    {
+        category: 'Wallet & Payments', icon: '💰',
+        questions: [
+            { q: 'How do I add money to my wallet?', a: 'Go to the Wallet tab, enter the amount, and click "Add via UPI". The money will be credited instantly to your StudentLoop wallet.' },
+            { q: 'Why was my payment declined?', a: 'Payments are declined when your wallet balance is insufficient. Please add money to your wallet first, then retry your order or delivery request.' },
+            { q: 'Where can I see my transactions?', a: 'All transactions (credits and debits) are visible in the Wallet tab under "Recent Transactions". They persist across sessions.' },
+            { q: 'How do I earn bonus coins?', a: 'Bonus coins are earned automatically — 5% of every order amount. You also earn coins for completing deliveries and signing up.' },
+        ]
+    },
+    {
+        category: 'Orders & Delivery', icon: '📦',
+        questions: [
+            { q: 'How do I place an order?', a: 'Browse shops on the Home tab, add items to cart, set delivery location and tip, then confirm. The total is deducted from your wallet and a delivery request is created.' },
+            { q: 'How does delivery matching work?', a: 'When you place an order, it appears on the Delivery Dashboard. Nearby carriers can accept and deliver it. You can track progress in real-time.' },
+            { q: 'What is the OTP for?', a: 'The 4-digit OTP ensures your delivery reaches the right person. Share it with your carrier only upon receiving your items.' },
+            { q: 'How do I report an issue?', a: 'Go to Profile → Order History → select the order → Report Issue. Choose the issue type, optionally upload a photo, and submit.' },
+        ]
+    },
+    {
+        category: 'Delivering & Earning', icon: '🚚',
+        questions: [
+            { q: 'How do I start delivering?', a: 'Go to the Deliver tab to see open requests near you. Accept one, purchase the items, upload the bill, deliver to the requester, and get the OTP to confirm completion.' },
+            { q: 'How much can I earn?', a: 'Each delivery has a base reward (set by the requester) plus a tip. Typical earnings range from ₹25 to ₹75 per delivery. Your earnings are credited instantly.' },
+            { q: 'What if I can\'t complete a delivery?', a: 'If you cannot complete an accepted delivery, please contact the requester via in-app chat. Repeated cancellations may affect your Trust Score.' },
+        ]
+    },
+    {
+        category: 'Safety & Privacy', icon: '🔒',
+        questions: [
+            { q: 'Is my data secure?', a: 'Yes. All data is encrypted using AES-256 encryption. Your personal information is never shared with other users without your consent.' },
+            { q: 'Who can see my information?', a: 'Other users can only see your first name and Trust Score. Your email, phone number, and room details are only shared with matched carriers.' },
+            { q: 'How do I report a user?', a: 'You can report issues through the Order History → Report Issue flow. Our team reviews all reports within 24 hours.' },
+        ]
+    },
+];
+
+/* ── TERMS & CONDITIONS ── */
+export const TERMS_AND_CONDITIONS = `
+## Terms and Conditions — StudentLoop
+
+**Last Updated:** March 2026
+
+### 1. Acceptance of Terms
+By accessing or using the StudentLoop platform, you agree to be bound by these Terms and Conditions. If you do not agree, you may not use the service.
+
+### 2. Eligibility
+StudentLoop is available exclusively to verified students of participating educational institutions. You must have a valid college email address to register.
+
+### 3. Account Responsibility
+You are responsible for maintaining the confidentiality of your account credentials. Any activity under your account is your responsibility.
+
+### 4. Wallet & Payments
+- Wallet balances are non-refundable except in cases of verified disputes.
+- All payments for orders and delivery requests are deducted from your wallet.
+- You must maintain sufficient balance before placing orders.
+- Bonus coins are promotional and cannot be converted to cash.
+
+### 5. Delivery Terms
+- Carriers are independent student peers, not employees of StudentLoop.
+- StudentLoop is not liable for the quality, condition, or accuracy of delivered items.
+- Tips are voluntary and go directly to the carrier.
+- OTP verification is mandatory for delivery confirmation.
+
+### 6. User Conduct
+- You agree not to misuse the platform for any unlawful activity.
+- Any form of harassment, fraud, or abuse may result in immediate account suspension.
+- You must provide accurate information in all orders and requests.
+
+### 7. Privacy
+- We collect and process your data as described in our Privacy Policy.
+- Your personal information is encrypted and never sold to third parties.
+- Location and activity data is used solely for service improvement.
+
+### 8. Disputes
+- Users may file disputes through the in-app reporting system.
+- StudentLoop will mediate disputes but is not liable for losses.
+- Decisions made by the dispute resolution team are final.
+
+### 9. Limitation of Liability
+StudentLoop is provided \"as is\" without warranties. We are not responsible for any direct, indirect, or consequential damages arising from use of the platform.
+
+### 10. Changes to Terms
+We reserve the right to modify these terms at any time. Continued use of the platform constitutes acceptance of updated terms.
+
+**By checking the box below, you acknowledge that you have read, understood, and agree to these Terms and Conditions.**
+`;

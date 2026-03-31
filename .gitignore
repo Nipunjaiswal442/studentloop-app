@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .env
+.env.local
+server-python/.env
 server-python/__pycache__/
 server-python/studentloop.db
 *.db

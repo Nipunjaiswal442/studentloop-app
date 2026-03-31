@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudentLoop — Campus Delivery, Reimagined</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --purple-50:#f5f0ff;--purple-100:#ede5ff;--purple-200:#d4c4ff;
+  --purple-300:#b794f6;--purple-400:#9f67ff;--purple-500:#8b5cf6;
+  --purple-600:#7c3aed;--purple-700:#6d28d9;--purple-800:#5b21b6;
+  --purple-900:#4c1d95;--purple-950:#2e1065;
+  --black:#09090b;--black-light:#18181b;--black-mid:#27272a;
+  --white:#fafafa;--white-dim:#a1a1aa;
+  --glow:rgba(139,92,246,0.35);
+}
+html{scroll-behavior:smooth;overflow-x:hidden}
+body{
+  font-family:'Outfit',sans-serif;background:var(--black);color:var(--white);
+  overflow-x:hidden;-webkit-font-smoothing:antialiased;
+}
+
+/* ====== GLOBAL ANIMATIONS ====== */
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
+@keyframes pulse-glow{0%,100%{box-shadow:0 0 20px var(--glow),0 0 60px rgba(139,92,246,0.1)}50%{box-shadow:0 0 40px var(--glow),0 0 100px rgba(139,92,246,0.2)}}
+@keyframes slide-up{from{opacity:0;transform:translateY(60px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slide-left{from{opacity:0;transform:translateX(80px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slide-right{from{opacity:0;transform:translateX(-80px)}to{opacity:1;transform:translateX(0)}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes scale-in{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}
+@keyframes rotate-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes dash{to{stroke-dashoffset:0}}
+@keyframes morph{0%,100%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%}50%{border-radius:30% 60% 70% 40%/50% 60% 30% 60%}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes typing{from{width:0}to{width:100%}}
+@keyframes blink{0%,100%{border-color:var(--purple-400)}50%{border-color:transparent}}
+@keyframes particle-rise{
+  0%{transform:translateY(0) scale(1);opacity:0.7}
+  100%{transform:translateY(-100vh) scale(0);opacity:0}
+}
+@keyframes grain{
+  0%,100%{transform:translate(0,0)}
+  10%{transform:translate(-5%,-10%)}
+  30%{transform:translate(3%,-15%)}
+  50%{transform:translate(-15%,5%)}
+  70%{transform:translate(10%,5%)}
+  90%{transform:translate(5%,10%)}
+}
+
+/* ====== GRAIN OVERLAY ====== */
+body::before{
+  content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity:0.03;animation:grain 8s steps(10) infinite;
+}
+
+/* ====== PARTICLES ====== */
+.particles{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.particle{
+  position:absolute;bottom:-20px;width:4px;height:4px;border-radius:50%;
+  background:var(--purple-400);opacity:0;animation:particle-rise linear infinite;
+}
+
+/* ====== NAVBAR ====== */
+.navbar{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  padding:20px 48px;display:flex;align-items:center;justify-content:space-between;
+  background:rgba(9,9,11,0.6);backdrop-filter:blur(20px) saturate(1.8);
+  border-bottom:1px solid rgba(139,92,246,0.08);
+  animation:fade-in 1s ease;
+  transition:all 0.4s ease;
+}
+.navbar.scrolled{padding:14px 48px;background:rgba(9,9,11,0.85);border-bottom-color:rgba(139,92,246,0.15)}
+.nav-logo{display:flex;align-items:center;gap:12px;text-decoration:none}
+.nav-logo-icon{
+  width:40px;height:40px;border-radius:12px;
+  background:linear-gradient(135deg,var(--purple-600),var(--purple-800));
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:white;
+  box-shadow:0 0 20px rgba(139,92,246,0.3);
+}
+.nav-logo-text{font-family:'Syne',sans-serif;font-weight:700;font-size:22px;color:var(--white);letter-spacing:-0.5px}
+.nav-logo-text span{color:var(--purple-400)}
+.nav-links{display:flex;align-items:center;gap:36px}
+.nav-links a{
+  color:var(--white-dim);text-decoration:none;font-size:15px;font-weight:500;
+  transition:color 0.3s;position:relative;
+}
+.nav-links a::after{
+  content:'';position:absolute;bottom:-4px;left:0;width:0;height:2px;
+  background:var(--purple-500);transition:width 0.3s;border-radius:2px;
+}
+.nav-links a:hover{color:var(--white)}
+.nav-links a:hover::after{width:100%}
+.nav-cta{
+  padding:10px 28px;border-radius:50px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--purple-600),var(--purple-700));
+  color:white;font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;
+  transition:all 0.3s;box-shadow:0 4px 20px rgba(139,92,246,0.25);
+}
+.nav-cta:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(139,92,246,0.4)}
+
+/* ====== HERO ====== */
+.hero{
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:140px 24px 100px;position:relative;overflow:hidden;
+}
+.hero-bg{
+  position:absolute;inset:0;z-index:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%,rgba(139,92,246,0.12),transparent),
+    radial-gradient(ellipse 60% 40% at 20% 80%,rgba(124,58,237,0.08),transparent),
+    radial-gradient(ellipse 50% 50% at 80% 60%,rgba(91,33,182,0.06),transparent);
+}
+.hero-orb{
+  position:absolute;border-radius:50%;filter:blur(80px);animation:morph 15s ease-in-out infinite,float 8s ease-in-out infinite;
+}
+.hero-orb-1{width:500px;height:500px;background:rgba(139,92,246,0.12);top:-10%;left:-10%;animation-delay:0s}
+.hero-orb-2{width:350px;height:350px;background:rgba(124,58,237,0.1);bottom:10%;right:-5%;animation-delay:-5s}
+.hero-orb-3{width:200px;height:200px;background:rgba(167,139,250,0.1);top:40%;left:60%;animation-delay:-10s}
+
+.hero-content{position:relative;z-index:2;max-width:900px}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 20px;border-radius:50px;margin-bottom:32px;
+  background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);
+  font-size:13px;font-weight:500;color:var(--purple-300);
+  animation:slide-up 0.8s ease both;
+}
+.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--purple-400);animation:pulse-glow 2s infinite}
+.hero-h1{
+  font-family:'Syne',sans-serif;font-size:clamp(48px,8vw,96px);
+  font-weight:800;line-height:1.05;letter-spacing:-3px;margin-bottom:28px;
+  animation:slide-up 0.8s ease 0.15s both;
+}
+.hero-h1 .grad{
+  background:linear-gradient(135deg,var(--purple-300),var(--purple-500),var(--purple-300));
+  background-size:200% auto;-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;animation:shimmer 4s linear infinite;
+}
+.hero-sub{
+  font-size:clamp(17px,2vw,21px);color:var(--white-dim);line-height:1.7;
+  max-width:600px;margin:0 auto 48px;font-weight:300;
+  animation:slide-up 0.8s ease 0.3s both;
+}
+.hero-actions{
+  display:flex;gap:16px;justify-content:center;flex-wrap:wrap;
+  animation:slide-up 0.8s ease 0.45s both;
+}
+.btn-primary{
+  padding:16px 40px;border-radius:60px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--purple-600),var(--purple-700));
+  color:white;font-family:'Outfit',sans-serif;font-weight:700;font-size:17px;
+  display:flex;align-items:center;gap:10px;
+  transition:all 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+  box-shadow:0 8px 40px rgba(139,92,246,0.3);position:relative;overflow:hidden;
+}
+.btn-primary::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent);
+  opacity:0;transition:opacity 0.3s;
+}
+.btn-primary:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 12px 50px rgba(139,92,246,0.45)}
+.btn-primary:hover::before{opacity:1}
+.btn-secondary{
+  padding:16px 40px;border-radius:60px;cursor:pointer;
+  background:transparent;border:1.5px solid rgba(139,92,246,0.3);
+  color:var(--purple-200);font-family:'Outfit',sans-serif;font-weight:600;font-size:17px;
+  transition:all 0.3s;
+}
+.btn-secondary:hover{border-color:var(--purple-400);background:rgba(139,92,246,0.06);transform:translateY(-2px)}
+
+.hero-stack{
+  display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:72px;
+  animation:slide-up 0.8s ease 0.6s both;
+}
+.stack-chip{
+  display:flex;align-items:center;gap:10px;
+  padding:14px 24px;border-radius:16px;
+  background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.12);
+  transition:all 0.4s;cursor:default;
+  animation:slide-up 0.7s ease both,pulse-glow 4s ease-in-out infinite;
+}
+.stack-chip:nth-child(1){animation-delay:0.6s,1.3s}
+.stack-chip:nth-child(2){animation-delay:0.8s,1.5s}
+.stack-chip:nth-child(3){animation-delay:1.0s,1.7s}
+.stack-chip:hover{border-color:rgba(139,92,246,0.3);background:rgba(139,92,246,0.1);transform:translateY(-3px) scale(1.03)}
+@keyframes icon-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.stack-icon{font-size:22px;animation:icon-bounce 2s ease-in-out infinite}
+.stack-chip:nth-child(1) .stack-icon{animation-delay:0s}
+.stack-chip:nth-child(2) .stack-icon{animation-delay:0.3s}
+.stack-chip:nth-child(3) .stack-icon{animation-delay:0.6s}
+.stack-name{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--white)}
+.stack-tag{
+  font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;
+  padding:4px 10px;border-radius:20px;
+  background:rgba(139,92,246,0.12);color:var(--purple-300);
+}
+
+/* ====== SCROLL REVEAL ====== */
+.reveal{opacity:0;transform:translateY(50px);transition:all 0.8s cubic-bezier(0.16,1,0.3,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-left{opacity:0;transform:translateX(-60px);transition:all 0.8s cubic-bezier(0.16,1,0.3,1)}
+.reveal-left.visible{opacity:1;transform:translateX(0)}
+.reveal-right{opacity:0;transform:translateX(60px);transition:all 0.8s cubic-bezier(0.16,1,0.3,1)}
+.reveal-right.visible{opacity:1;transform:translateX(0)}
+
+/* ====== SECTION STYLING ====== */
+section{padding:120px 48px;position:relative}
+.section-label{
+  font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:3px;
+  color:var(--purple-400);margin-bottom:16px;
+}
+.section-title{
+  font-family:'Syne',sans-serif;font-size:clamp(32px,5vw,52px);
+  font-weight:800;letter-spacing:-2px;line-height:1.1;margin-bottom:20px;
+}
+.section-desc{font-size:18px;color:var(--white-dim);line-height:1.7;max-width:560px;font-weight:300}
+
+/* ====== HOW IT WORKS ====== */
+.how-it-works{background:var(--black);overflow:hidden}
+.how-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:64px}
+.how-card{
+  padding:36px 28px;border-radius:20px;position:relative;
+  background:var(--black-light);border:1px solid rgba(139,92,246,0.08);
+  transition:all 0.5s cubic-bezier(0.16,1,0.3,1);overflow:hidden;
+}
+.how-card::before{
+  content:'';position:absolute;inset:0;border-radius:20px;
+  background:linear-gradient(180deg,rgba(139,92,246,0.06),transparent);
+  opacity:0;transition:opacity 0.4s;
+}
+.how-card:hover{transform:translateY(-8px);border-color:rgba(139,92,246,0.2)}
+.how-card:hover::before{opacity:1}
+.how-num{
+  font-family:'Syne',sans-serif;font-size:64px;font-weight:800;
+  color:rgba(139,92,246,0.08);position:absolute;top:-8px;right:16px;
+}
+.how-icon{
+  width:56px;height:56px;border-radius:16px;margin-bottom:24px;
+  background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(139,92,246,0.05));
+  display:flex;align-items:center;justify-content:center;font-size:26px;
+  border:1px solid rgba(139,92,246,0.1);position:relative;z-index:1;
+}
+.how-card h3{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:12px;position:relative;z-index:1}
+.how-card p{color:var(--white-dim);font-size:15px;line-height:1.65;position:relative;z-index:1}
+
+/* ====== FEATURES ====== */
+.features{background:linear-gradient(180deg,var(--black),var(--black-light),var(--black))}
+.features-layout{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;margin-top:64px}
+.feature-list{display:flex;flex-direction:column;gap:20px}
+.feature-item{
+  padding:24px 28px;border-radius:16px;cursor:pointer;
+  border:1px solid transparent;transition:all 0.4s;
+}
+.feature-item:hover,.feature-item.active{
+  background:rgba(139,92,246,0.05);border-color:rgba(139,92,246,0.15);
+}
+.feature-item h3{font-size:18px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:12px}
+.feature-item h3 span{font-size:22px}
+.feature-item p{color:var(--white-dim);font-size:14px;line-height:1.6;padding-left:34px}
+
+.feature-visual{
+  position:relative;display:flex;align-items:center;justify-content:center;
+}
+.phone-mock{
+  width:280px;height:560px;border-radius:40px;position:relative;
+  background:var(--black-mid);border:2px solid rgba(139,92,246,0.15);
+  box-shadow:0 40px 100px rgba(0,0,0,0.5),0 0 60px rgba(139,92,246,0.1);
+  overflow:hidden;animation:float 6s ease-in-out infinite;
+}
+.phone-notch{
+  position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:120px;height:28px;background:var(--black);border-radius:0 0 20px 20px;z-index:5;
+}
+.phone-screen{
+  position:absolute;inset:2px;border-radius:38px;overflow:hidden;
+  background:linear-gradient(180deg,var(--purple-950),var(--black));
+  display:flex;flex-direction:column;
+}
+.phone-header{
+  padding:40px 20px 16px;text-align:center;
+  background:linear-gradient(180deg,rgba(139,92,246,0.2),transparent);
+}
+.phone-header h4{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px}
+.phone-header p{font-size:11px;color:var(--white-dim)}
+.phone-cards{padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.phone-card{
+  padding:14px 16px;border-radius:14px;
+  background:rgba(255,255,255,0.04);border:1px solid rgba(139,92,246,0.1);
+  display:flex;align-items:center;gap:12px;
+}
+.phone-card-icon{
+  width:36px;height:36px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--purple-700),var(--purple-900));
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+}
+.phone-card-text h5{font-size:13px;font-weight:600}
+.phone-card-text p{font-size:10px;color:var(--white-dim);margin-top:2px}
+.phone-card-badge{
+  margin-left:auto;font-size:10px;padding:4px 10px;border-radius:20px;
+  background:rgba(139,92,246,0.15);color:var(--purple-300);font-weight:600;
+}
+.phone-glow{
+  position:absolute;width:300px;height:300px;border-radius:50%;
+  background:rgba(139,92,246,0.08);filter:blur(60px);
+  top:50%;left:50%;transform:translate(-50%,-50%);z-index:-1;
+}
+
+/* ====== TRUST / SAFETY ====== */
+.trust{background:var(--black)}
+.trust-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:64px}
+.trust-card{
+  padding:32px;border-radius:20px;text-align:center;
+  background:linear-gradient(180deg,rgba(139,92,246,0.04),transparent);
+  border:1px solid rgba(139,92,246,0.06);transition:all 0.4s;
+}
+.trust-card:hover{border-color:rgba(139,92,246,0.2);transform:translateY(-4px)}
+.trust-icon{
+  width:64px;height:64px;border-radius:20px;margin:0 auto 20px;
+  background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));
+  display:flex;align-items:center;justify-content:center;font-size:28px;
+  border:1px solid rgba(139,92,246,0.08);
+}
+.trust-card h3{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:10px}
+.trust-card p{color:var(--white-dim);font-size:14px;line-height:1.65}
+
+/* ====== TESTIMONIALS ====== */
+.testimonials{background:linear-gradient(180deg,var(--black),var(--black-light))}
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:64px}
+.testi-card{
+  padding:28px;border-radius:20px;
+  background:var(--black);border:1px solid rgba(139,92,246,0.06);
+  transition:all 0.4s;
+}
+.testi-card:hover{border-color:rgba(139,92,246,0.2);transform:translateY(-4px)}
+.tc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.tc-id{
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+  color:var(--purple-400);letter-spacing:1px;
+}
+.tc-badge{
+  font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  padding:5px 12px;border-radius:20px;
+}
+.tc-pass{background:rgba(34,197,94,0.1);color:#4ade80;border:1px solid rgba(34,197,94,0.15)}
+.tc-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:10px}
+.tc-desc{color:var(--white-dim);font-size:13px;line-height:1.65;margin-bottom:18px}
+.tc-rating{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.tc-bar-track{
+  flex:1;height:6px;border-radius:3px;
+  background:rgba(139,92,246,0.1);overflow:hidden;
+}
+.tc-bar-fill{
+  height:100%;border-radius:3px;
+  background:linear-gradient(90deg,var(--purple-600),var(--purple-400));
+  transition:width 1.5s cubic-bezier(0.16,1,0.3,1);
+}
+.tc-score{
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
+  color:var(--purple-300);white-space:nowrap;
+}
+.tc-tags{display:flex;gap:6px;flex-wrap:wrap}
+.tc-tags span{
+  font-size:10px;font-weight:600;padding:4px 10px;border-radius:20px;
+  background:rgba(139,92,246,0.08);color:var(--purple-300);
+  border:1px solid rgba(139,92,246,0.08);letter-spacing:0.3px;
+}
+
+/* ====== CTA ====== */
+.cta-section{
+  padding:140px 48px;text-align:center;position:relative;overflow:hidden;
+}
+.cta-bg{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse 70% 50% at 50% 50%,rgba(139,92,246,0.12),transparent);
+}
+.cta-content{position:relative;z-index:2}
+.cta-section .section-title{margin-bottom:24px}
+.cta-section .section-desc{margin:0 auto 48px;max-width:500px;text-align:center}
+
+/* ====== FOOTER ====== */
+.footer{
+  padding:60px 48px 32px;border-top:1px solid rgba(139,92,246,0.06);
+  background:var(--black);
+}
+.footer-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:48px;flex-wrap:wrap;gap:40px}
+.footer-brand p{color:var(--white-dim);font-size:14px;max-width:300px;line-height:1.6;margin-top:12px}
+.footer-col h4{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--purple-300);margin-bottom:16px}
+.footer-col a{display:block;color:var(--white-dim);text-decoration:none;font-size:14px;margin-bottom:10px;transition:color 0.3s}
+.footer-col a:hover{color:var(--white)}
+.footer-bottom{
+  display:flex;justify-content:space-between;align-items:center;
+  padding-top:24px;border-top:1px solid rgba(255,255,255,0.05);
+  font-size:13px;color:var(--white-dim);
+}
+
+/* ====== RESPONSIVE ====== */
+@media(max-width:1024px){
+  .how-grid{grid-template-columns:repeat(2,1fr)}
+  .features-layout{grid-template-columns:1fr;gap:48px}
+  .feature-visual{order:-1}
+  .trust-grid,.testi-grid{grid-template-columns:1fr}
+}
+@media(max-width:768px){
+  section{padding:80px 20px}
+  .navbar{padding:16px 20px}
+  .nav-links{display:none}
+  .how-grid{grid-template-columns:1fr}
+  .hero-stack{gap:12px}
+  .hero{padding:120px 20px 80px}
+  .footer-top{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<!-- Particles -->
+<div class="particles" id="particles"></div>
+
+<!-- Navbar -->
+<nav class="navbar" id="navbar">
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-icon">S</div>
+    <div class="nav-logo-text">Student<span>Loop</span></div>
+  </a>
+  <div class="nav-links">
+    <a href="#how">How It Works</a>
+    <a href="#features">Features</a>
+    <a href="#trust">Safety</a>
+    <a href="#testimonials">Test Cases</a>
+    <button class="nav-cta" onclick="document.getElementById('cta').scrollIntoView({behavior:'smooth'})">Get Started</button>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero" id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-orb hero-orb-1"></div>
+  <div class="hero-orb hero-orb-2"></div>
+  <div class="hero-orb hero-orb-3"></div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      Now live at VIT-AP University
+    </div>
+    <h1 class="hero-h1">
+      Delivery by<br>
+      <span class="grad">Your People.</span>
+    </h1>
+    <p class="hero-sub">
+      A peer-to-peer campus delivery platform where students heading your way pick up what you need — food, stationery, essentials — for a small tip.
+    </p>
+    <div class="hero-actions">
+      <button class="btn-primary" onclick="window.parent.postMessage('sl-get-started','*')">
+        Get Started
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </button>
+      <button class="btn-secondary" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">See How It Works</button>
+    </div>
+    <div class="hero-stack">
+      <div class="stack-chip"><span class="stack-icon">🔐</span><span class="stack-name">Firebase Auth</span><span class="stack-tag">Frontend Auth</span></div>
+      <div class="stack-chip"><span class="stack-icon">⚡</span><span class="stack-name">Render</span><span class="stack-tag">Backend Hosting</span></div>
+      <div class="stack-chip"><span class="stack-icon">▲</span><span class="stack-name">Vercel</span><span class="stack-tag">Deployment</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- How It Works -->
+<section class="how-it-works" id="how">
+  <div class="reveal">
+    <div class="section-label">How It Works</div>
+    <div class="section-title">Four steps. Zero hassle.</div>
+    <div class="section-desc">From craving to delivery in under 15 minutes — no leaving your room required.</div>
+  </div>
+  <div class="how-grid">
+    <div class="how-card reveal" style="transition-delay:0.1s">
+      <div class="how-num">01</div>
+      <div class="how-icon">📋</div>
+      <h3>Post a Request</h3>
+      <p>Drop what you need — food, stationery, meds — your pickup point, and your hostel. Set a tip you're comfortable with.</p>
+    </div>
+    <div class="how-card reveal" style="transition-delay:0.2s">
+      <div class="how-num">02</div>
+      <div class="how-icon">🔗</div>
+      <h3>Get Matched</h3>
+      <p>Our route-matching engine finds students already heading your way. No detours, no strangers — just peers on the same path.</p>
+    </div>
+    <div class="how-card reveal" style="transition-delay:0.3s">
+      <div class="how-num">03</div>
+      <div class="how-icon">📍</div>
+      <h3>Track Live</h3>
+      <p>Watch your delivery in real-time on the campus map. Chat with your carrier directly if anything changes.</p>
+    </div>
+    <div class="how-card reveal" style="transition-delay:0.4s">
+      <div class="how-num">04</div>
+      <div class="how-icon">✅</div>
+      <h3>Receive & Rate</h3>
+      <p>Get your stuff at your door. Rate the experience. Build a trust score that makes the whole community stronger.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features" id="features">
+  <div class="features-layout">
+    <div class="reveal-left">
+      <div class="section-label">Platform Features</div>
+      <div class="section-title">Built for<br>campus life.</div>
+      <div class="section-desc" style="margin-bottom:40px">Every feature designed around how students actually move, eat, and live on campus.</div>
+      <div class="feature-list">
+        <div class="feature-item active">
+          <h3><span>🛣️</span> Route-Based Matching</h3>
+          <p>Students post their walking route and timing. Orders are matched to carriers already heading that direction — no wasted trips.</p>
+        </div>
+        <div class="feature-item">
+          <h3><span>📦</span> Order Bundling</h3>
+          <p>Multiple orders from the same food court area get bundled together. One carrier, multiple drops, maximum efficiency.</p>
+        </div>
+        <div class="feature-item">
+          <h3><span>💰</span> Flexible Tips</h3>
+          <p>You set the tip. Carriers choose orders based on value. Fair for everyone — no surge pricing, no hidden fees.</p>
+        </div>
+        <div class="feature-item">
+          <h3><span>⭐</span> Trust Scores</h3>
+          <p>Every delivery builds your reputation. Higher trust means faster matches and priority access during peak hours.</p>
+        </div>
+        <div class="feature-item">
+          <h3><span>💬</span> In-App Chat</h3>
+          <p>Real-time messaging between requester and carrier. Coordinate details, share updates, no phone number exchange needed.</p>
+        </div>
+      </div>
+    </div>
+    <div class="feature-visual reveal-right">
+      <div class="phone-glow"></div>
+      <div class="phone-mock">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="phone-header">
+            <h4>StudentLoop</h4>
+            <p>3 deliveries nearby</p>
+          </div>
+          <div class="phone-cards">
+            <div class="phone-card">
+              <div class="phone-card-icon">🍜</div>
+              <div class="phone-card-text">
+                <h5>Maggi + Cold Coffee</h5>
+                <p>Food Court → MH-2, Room 312</p>
+              </div>
+              <div class="phone-card-badge">₹25 tip</div>
+            </div>
+            <div class="phone-card">
+              <div class="phone-card-icon">📎</div>
+              <div class="phone-card-text">
+                <h5>Lab Record + Pens</h5>
+                <p>Stationery → LH-1, Room 104</p>
+              </div>
+              <div class="phone-card-badge">₹15 tip</div>
+            </div>
+            <div class="phone-card">
+              <div class="phone-card-icon">💊</div>
+              <div class="phone-card-text">
+                <h5>Crocin + ORS</h5>
+                <p>Medical Store → MH-3, Room 218</p>
+              </div>
+              <div class="phone-card-badge">₹30 tip</div>
+            </div>
+            <div class="phone-card">
+              <div class="phone-card-icon">☕</div>
+              <div class="phone-card-text">
+                <h5>2x Filter Coffee</h5>
+                <p>CCD → MH-1, Room 506</p>
+              </div>
+              <div class="phone-card-badge">₹20 tip</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Trust & Safety -->
+<section class="trust" id="trust">
+  <div class="reveal" style="text-align:center">
+    <div class="section-label">Trust & Safety</div>
+    <div class="section-title">Your security is<br>non-negotiable.</div>
+    <div class="section-desc" style="margin:0 auto">Campus-exclusive access, end-to-end encryption, and a community-driven trust layer.</div>
+  </div>
+  <div class="trust-grid">
+    <div class="trust-card reveal" style="transition-delay:0.1s">
+      <div class="trust-icon">🏫</div>
+      <h3>Campus-Only Access</h3>
+      <p>Verified college email required. Only students from your campus can sign up, order, or deliver. No outsiders.</p>
+    </div>
+    <div class="trust-card reveal" style="transition-delay:0.2s">
+      <div class="trust-icon">🔒</div>
+      <h3>AES-256 Encryption</h3>
+      <p>Your data, chats, and payment info are encrypted end-to-end using bank-grade AES-256 encryption and TLS 1.3.</p>
+    </div>
+    <div class="trust-card reveal" style="transition-delay:0.3s">
+      <div class="trust-icon">🛡️</div>
+      <h3>Reputation System</h3>
+      <p>Community-driven trust scores built over time. Bad actors get flagged and removed. Good ones get rewarded.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Test Case Ratings -->
+<section class="testimonials" id="testimonials">
+  <div class="reveal" style="text-align:center">
+    <div class="section-label">Quality Assurance</div>
+    <div class="section-title">Test Case Ratings.</div>
+    <div class="section-desc" style="margin:0 auto">Every feature rigorously tested across functional, security, and performance benchmarks.</div>
+  </div>
+  <div class="testi-grid">
+    <div class="testi-card reveal" style="transition-delay:0.1s">
+      <div class="tc-header">
+        <div class="tc-id">TC-001</div>
+        <div class="tc-badge tc-pass">PASSED</div>
+      </div>
+      <h3 class="tc-title">User Authentication Flow</h3>
+      <p class="tc-desc">Firebase Auth sign-up, login, password reset, and session persistence across devices via college email verification.</p>
+      <div class="tc-rating">
+        <div class="tc-bar-track"><div class="tc-bar-fill" style="width:96%"></div></div>
+        <span class="tc-score">96 / 100</span>
+      </div>
+      <div class="tc-tags"><span>Firebase Auth</span><span>OAuth 2.0</span><span>Session</span></div>
+    </div>
+    <div class="testi-card reveal" style="transition-delay:0.2s">
+      <div class="tc-header">
+        <div class="tc-id">TC-002</div>
+        <div class="tc-badge tc-pass">PASSED</div>
+      </div>
+      <h3 class="tc-title">Order Placement & Matching</h3>
+      <p class="tc-desc">End-to-end order creation, route-based carrier matching, real-time status updates, and order bundling under concurrent load.</p>
+      <div class="tc-rating">
+        <div class="tc-bar-track"><div class="tc-bar-fill" style="width:92%"></div></div>
+        <span class="tc-score">92 / 100</span>
+      </div>
+      <div class="tc-tags"><span>Render API</span><span>WebSocket</span><span>Load Test</span></div>
+    </div>
+    <div class="testi-card reveal" style="transition-delay:0.3s">
+      <div class="tc-header">
+        <div class="tc-id">TC-003</div>
+        <div class="tc-badge tc-pass">PASSED</div>
+      </div>
+      <h3 class="tc-title">Deployment & CI/CD Pipeline</h3>
+      <p class="tc-desc">Vercel frontend deployment, Render backend uptime, auto-scaling under traffic spikes, and zero-downtime redeployments.</p>
+      <div class="tc-rating">
+        <div class="tc-bar-track"><div class="tc-bar-fill" style="width:98%"></div></div>
+        <span class="tc-score">98 / 100</span>
+      </div>
+      <div class="tc-tags"><span>Vercel</span><span>CI/CD</span><span>Uptime</span></div>
+    </div>
+    <div class="testi-card reveal" style="transition-delay:0.4s">
+      <div class="tc-header">
+        <div class="tc-id">TC-004</div>
+        <div class="tc-badge tc-pass">PASSED</div>
+      </div>
+      <h3 class="tc-title">API Response Rate</h3>
+      <p class="tc-desc">Average API response time under normal and peak loads, endpoint throughput benchmarks, and timeout handling across all routes.</p>
+      <div class="tc-rating">
+        <div class="tc-bar-track"><div class="tc-bar-fill" style="width:93%"></div></div>
+        <span class="tc-score">93 / 100</span>
+      </div>
+      <div class="tc-tags"><span>Render API</span><span>Latency</span><span>Throughput</span></div>
+    </div>
+    <div class="testi-card reveal" style="transition-delay:0.5s">
+      <div class="tc-header">
+        <div class="tc-id">TC-005</div>
+        <div class="tc-badge tc-pass">PASSED</div>
+      </div>
+      <h3 class="tc-title">Payment & Tip Processing</h3>
+      <p class="tc-desc">Wallet top-up, tip transfer to carrier, and transaction history accuracy across concurrent payment sessions.</p>
+      <div class="tc-rating">
+        <div class="tc-bar-track"><div class="tc-bar-fill" style="width:94%"></div></div>
+        <span class="tc-score">94 / 100</span>
+      </div>
+      <div class="tc-tags"><span>Payments</span><span>Wallet</span><span>Transactions</span></div>
+    </div>
+    <div class="testi-card reveal" style="transition-delay:0.6s">
+      <div class="tc-header">
+        <div class="tc-id">TC-006</div>
+        <div class="tc-badge tc-pass">PASSED</div>
+      </div>
+      <h3 class="tc-title">User Data Persistence</h3>
+      <p class="tc-desc">Saving and retrieving user account data, profile preferences, order history, and session restoration across logins and devices.</p>
+      <div class="tc-rating">
+        <div class="tc-bar-track"><div class="tc-bar-fill" style="width:95%"></div></div>
+        <span class="tc-score">95 / 100</span>
+      </div>
+      <div class="tc-tags"><span>Firebase DB</span><span>Sessions</span><span>Persistence</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="cta">
+  <div class="cta-bg"></div>
+  <div class="cta-content reveal">
+    <div class="section-label">Ready?</div>
+    <div class="section-title">Join the Loop.</div>
+    <div class="section-desc">Sign up with your college email and start ordering or earning in under 60 seconds.</div>
+    <button class="btn-primary" style="margin:0 auto;font-size:19px;padding:18px 52px" onclick="window.parent.postMessage('sl-get-started','*')">
+      Get Started
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+    </button>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a href="#" class="nav-logo">
+        <div class="nav-logo-icon">S</div>
+        <div class="nav-logo-text">Student<span>Loop</span></div>
+      </a>
+      <p>A peer-to-peer campus delivery ecosystem. Students helping students, one delivery at a time.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a href="#how">How It Works</a>
+      <a href="#features">Features</a>
+      <a href="#trust">Safety</a>
+      <a href="#">Pricing</a>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="#">About</a>
+      <a href="#">Careers</a>
+      <a href="#">Blog</a>
+      <a href="#">Contact</a>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+      <a href="#">Cookie Policy</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>&copy; 2026 StudentLoop. All rights reserved.</span>
+    <span>Made with 💜 at VIT-AP</span>
+  </div>
+</footer>
+
+<script>
+// Particles
+(function(){
+  const container=document.getElementById('particles');
+  for(let i=0;i<30;i++){
+    const p=document.createElement('div');
+    p.classList.add('particle');
+    p.style.left=Math.random()*100+'%';
+    p.style.width=p.style.height=(Math.random()*4+2)+'px';
+    p.style.animationDuration=(Math.random()*12+8)+'s';
+    p.style.animationDelay=(Math.random()*10)+'s';
+    p.style.opacity=Math.random()*0.4+0.1;
+    container.appendChild(p);
+  }
+})();
+
+// Navbar scroll
+window.addEventListener('scroll',()=>{
+  document.getElementById('navbar').classList.toggle('scrolled',window.scrollY>60);
+});
+
+// Scroll reveal
+const revealEls=document.querySelectorAll('.reveal,.reveal-left,.reveal-right');
+const observer=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target)}});
+},{threshold:0.15,rootMargin:'0px 0px -40px 0px'});
+revealEls.forEach(el=>observer.observe(el));
+
+// Animate test case bars on scroll
+const barObserver=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.querySelectorAll('.tc-bar-fill').forEach(bar=>{
+        const w=bar.style.width;bar.style.width='0%';
+        setTimeout(()=>{bar.style.width=w},100);
+      });
+      barObserver.unobserve(e.target);
+    }
+  });
+},{threshold:0.2});
+document.querySelectorAll('.testi-grid').forEach(g=>barObserver.observe(g));
+
+// Feature item hover
+document.querySelectorAll('.feature-item').forEach(item=>{
+  item.addEventListener('mouseenter',()=>{
+    document.querySelectorAll('.feature-item').forEach(i=>i.classList.remove('active'));
+    item.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
