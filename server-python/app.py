@@ -779,14 +779,14 @@ def create_shop():
 #  GEMINI AI CHAT
 # ═════════════════════════════════════════════
 
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+NVIDIA_API_KEY = os.environ.get('NVIDIA_API_KEY', '')
 
 @app.route('/api/chat/gemini', methods=['POST'])
 @auth_required
 def chat_gemini():
-    """Proxy chat requests to Google Gemini API."""
-    if not GEMINI_API_KEY:
-        return jsonify({'error': 'Gemini API key not configured'}), 500
+    """Proxy chat requests to NVIDIA NIM API (Route kept as /gemini for frontend compatibility)."""
+    if not NVIDIA_API_KEY:
+        return jsonify({'error': 'NVIDIA API key not configured'}), 500
 
     data = request.get_json(force=True)
     message = data.get('message', '').strip()
@@ -814,27 +814,33 @@ def chat_gemini():
     )
 
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={GEMINI_API_KEY}"
-        payload = {
-            "contents": [
-                {"role": "user", "parts": [{"text": f"{system_prompt}\n\nUser question: {message}"}]}
-            ],
-            "generationConfig": {
-                "maxOutputTokens": 256,
-                "temperature": 0.7,
-            }
+        url = "https://integrate.api.nvidia.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {NVIDIA_API_KEY}",
+            "Accept": "application/json"
         }
-        resp = http_requests.post(url, json=payload, timeout=15)
+        
+        payload = {
+            "model": "qwen/qwen3.5-122b-a10b",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message}
+            ],
+            "max_tokens": 1024,
+            "temperature": 0.60,
+            "top_p": 0.95,
+            "stream": False,
+        }
+        
+        resp = http_requests.post(url, headers=headers, json=payload, timeout=20)
         resp.raise_for_status()
         result = resp.json()
 
-        # Extract text from Gemini response
+        # Extract text from NVIDIA response
         reply = ''
-        candidates = result.get('candidates', [])
-        if candidates:
-            parts = candidates[0].get('content', {}).get('parts', [])
-            if parts:
-                reply = parts[0].get('text', '')
+        choices = result.get('choices', [])
+        if choices:
+            reply = choices[0].get('message', {}).get('content', '')
 
         if not reply:
             reply = "I'm sorry, I couldn't generate a response. Please try again."
@@ -850,19 +856,10 @@ def chat_gemini():
         else:
             err_msg = str(e)
             
-        # Try to parse Google's JSON error if possible
-        display_msg = "Unknown Error"
-        try:
-            err_data = result = e.response.json()
-            if 'error' in err_data and 'message' in err_data['error']:
-                display_msg = err_data['error']['message']
-        except:
-            display_msg = err_msg or str(e)
-
-        print(f"Gemini API HTTP {status_code}: {err_msg}")
-        return jsonify({'error': f'Google API Error ({status_code}): {display_msg}'}), 502
+        print(f"NVIDIA API HTTP {status_code}: {err_msg}")
+        return jsonify({'error': f'AI API Error ({status_code}): {err_msg[:200]}...'}), 502
     except Exception as e:
-        print(f"Gemini API error: {e}")
+        print(f"NVIDIA API error: {e}")
         return jsonify({'error': 'AI service unavailable. Please try the FAQ instead.'}), 502
 
 
