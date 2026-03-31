@@ -974,7 +974,7 @@ export default function App() {
           <div className="flex gap-3">
             <input type="number" placeholder="Enter amount" value={addMoneyAmt} onChange={e => setAddMoneyAmt(e.target.value)}
               className="flex-1 bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
-            <button onClick={async () => { if (addMoneyAmt) { try { const res = await api.wallet.addMoney(Number(addMoneyAmt)); setWalletBalance(res.balance); setBonusCoins(res.bonusCoins); fetchWallet(); setAddMoneyAmt(''); } catch (e) { alert('Failed'); } } }}
+            <button onClick={async () => { if (addMoneyAmt) { try { const res = await api.wallet.addMoney(Number(addMoneyAmt)); setWalletBalance(res.balance); setBonusCoins(res.bonusCoins); fetchWallet(); setAddMoneyAmt(''); } catch (e: any) { alert('Failed: ' + (e.message || 'Unknown error. Check if your session is valid by refreshing.')); } } }}
               className="px-6 py-3 rounded-xl gradient-purple text-white text-sm font-semibold flex items-center gap-2"><CreditCard size={14} />Add via UPI</button>
           </div>
         </div>

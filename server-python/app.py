@@ -481,43 +481,54 @@ def get_wallet():
 @app.route('/api/wallet/add', methods=['POST'])
 @auth_required
 def add_money():
-    data = request.get_json(force=True)
-    amount = data.get('amount', 0)
-    if not amount or amount == 0:
-        return jsonify({'error': 'Invalid amount'}), 400
+    try:
+        data = request.get_json(force=True)
+        raw_amt = data.get('amount', 0)
+        try:
+            amount = int(float(raw_amt))
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid amount format'}), 400
 
-    db = get_db()
+        if not amount or amount == 0:
+            return jsonify({'error': 'Invalid amount'}), 400
 
-    if amount > 0:
-        # Credit — UPI top-up
-        db.execute('UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?', (amount, g.user_id))
-        db.execute(
-            'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
-            (g.user_id, 'credit', amount, 'Added via UPI', 'upi_add')
-        )
-        db.execute(
-            'INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)',
-            (g.user_id, 'wallet_topup', f'Added ₹{amount} via UPI')
-        )
-    else:
-        # Debit — order payment
-        abs_amount = abs(amount)
-        user = dict_row(db.execute('SELECT wallet_balance FROM users WHERE id = ?', (g.user_id,)).fetchone())
-        if user['wallet_balance'] < abs_amount:
-            return jsonify({'error': 'Insufficient balance'}), 400
-        db.execute('UPDATE users SET wallet_balance = wallet_balance - ? WHERE id = ?', (abs_amount, g.user_id))
-        db.execute(
-            'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
-            (g.user_id, 'debit', abs_amount, 'Order payment', 'order_payment')
-        )
-        db.execute(
-            'INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)',
-            (g.user_id, 'order_payment', f'Paid ₹{abs_amount} for order')
-        )
+        db = get_db()
 
-    db.commit()
-    user = dict_row(db.execute('SELECT wallet_balance, bonus_coins FROM users WHERE id = ?', (g.user_id,)).fetchone())
-    return jsonify({'balance': user['wallet_balance'], 'bonusCoins': user['bonus_coins']})
+        if amount > 0:
+            # Credit — UPI top-up
+            db.execute('UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?', (amount, g.user_id))
+            db.execute(
+                'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
+                (g.user_id, 'credit', amount, 'Added via UPI', 'upi_add')
+            )
+            db.execute(
+                'INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)',
+                (g.user_id, 'wallet_topup', f'Added ₹{amount} via UPI')
+            )
+        else:
+            # Debit — order payment
+            abs_amount = abs(amount)
+            user = dict_row(db.execute('SELECT wallet_balance FROM users WHERE id = ?', (g.user_id,)).fetchone())
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+            if user['wallet_balance'] < abs_amount:
+                return jsonify({'error': 'Insufficient balance'}), 400
+            db.execute('UPDATE users SET wallet_balance = wallet_balance - ? WHERE id = ?', (abs_amount, g.user_id))
+            db.execute(
+                'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
+                (g.user_id, 'debit', abs_amount, 'Order payment', 'order_payment')
+            )
+            db.execute(
+                'INSERT INTO activity_log (user_id, action, details) VALUES (?, ?, ?)',
+                (g.user_id, 'order_payment', f'Paid ₹{abs_amount} for order')
+            )
+
+        db.commit()
+        user = dict_row(db.execute('SELECT wallet_balance, bonus_coins FROM users WHERE id = ?', (g.user_id,)).fetchone())
+        return jsonify({'balance': user['wallet_balance'], 'bonusCoins': user['bonus_coins']})
+    except Exception as e:
+        print(f"Error in add_money: {e}")
+        return jsonify({'error': f"Internal Server Error: {e}"}), 500
 
 
 # ═══════════════════════════════════════════
