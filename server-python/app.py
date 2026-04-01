@@ -667,7 +667,36 @@ def complete_delivery(dr_id):
     db = get_db()
     row = db.execute('SELECT * FROM delivery_requests WHERE id = ?', (dr_id,)).fetchone()
     if not row:
+        if dr_id <= 100:
+            # It's a frontend static dummy delivery. We should still credit the user's wallet!
+            req_data = request.json or {}
+            reward = int(req_data.get('reward') or 30)
+            tip = int(req_data.get('tip') or 0)
+            total_earning = reward + tip
+            
+            db.execute(
+                'UPDATE users SET wallet_balance = wallet_balance + ?, deliveries = deliveries + 1, points = points + ? WHERE id = ?',
+                (total_earning, reward, g.user_id)
+            )
+            db.execute(
+                'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
+                (g.user_id, 'credit', reward, f'Delivery reward — #{dr_id}', f'delivery_reward_{dr_id}')
+            )
+            if tip > 0:
+                db.execute(
+                    'INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)',
+                    (g.user_id, 'credit', tip, f'Tip earned (+₹{tip}) — delivery #{dr_id}', f'delivery_tip_{dr_id}')
+                )
+            db.execute(
+                'INSERT INTO activity_log (user_id, action, details, points) VALUES (?, ?, ?, ?)',
+                (g.user_id, 'delivery_completed', f'Completed delivery #{dr_id} — earned ₹{total_earning} (reward ₹{reward} + tip ₹{tip})', reward)
+            )
+            db.commit()
+            updated_user = dict_row(db.execute('SELECT * FROM users WHERE id = ?', (g.user_id,)).fetchone())
+            return jsonify({'success': True, 'earned': total_earning, 'user': sanitize_user(updated_user)})
+            
         return jsonify({'error': 'Not found'}), 404
+    
     delivery = dict_row(row)
 
     db.execute("UPDATE delivery_requests SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (dr_id,))

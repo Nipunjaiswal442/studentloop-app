@@ -861,23 +861,16 @@ export default function App() {
   const handleCompleteDelivery = async () => {
     if (!selectedDelivery) return;
     const isStaticDelivery = selectedDelivery.id <= 100;
-    if (isStaticDelivery) {
-      // Fallback for static/demo deliveries — credit locally
-      const earned = (selectedDelivery.reward || 0) + (selectedDelivery.tip || 0);
-      setWalletBalance(b => b + earned);
-      setBonusCoins(c => c + (selectedDelivery.reward || 0));
-      // Add synthetic transactions so wallet history updates
-      setWalletTxns(prev => [
-        { type: 'credit', amount: selectedDelivery.reward, description: `Delivery reward — #${selectedDelivery.id}`, created_at: new Date().toISOString() },
-        ...(selectedDelivery.tip > 0 ? [{ type: 'credit', amount: selectedDelivery.tip, description: `Tip earned — delivery #${selectedDelivery.id}`, created_at: new Date().toISOString() }] : []),
-        ...prev,
-      ]);
-      setLiveDeliveries(prev => prev.filter(d => d.id !== selectedDelivery.id));
-      handleTab('home');
-      return;
-    }
+    
     try {
-      const res = await api.deliveries.complete(selectedDelivery.id);
+      // Call the API for ALL deliveries. 
+      // For static ones, we pass the reward/tip so the backend can credit them manually.
+      const res = await api.deliveries.complete(
+        selectedDelivery.id, 
+        isStaticDelivery ? selectedDelivery.reward : undefined,
+        isStaticDelivery ? selectedDelivery.tip : undefined
+      );
+
       // Sync full user state from API (wallet, deliveries count, points, etc.)
       if (res.user) {
         syncUserToProfile(res.user);
@@ -887,8 +880,9 @@ export default function App() {
       // Remove from live list
       setLiveDeliveries(prev => prev.filter(d => d.id !== selectedDelivery.id));
       handleTab('home');
-    } catch {
-      // API error — credit locally as fallback and still refresh wallet
+    } catch (err) {
+      console.error('Completion error:', err);
+      // Credit locally as fallback if API fails
       const earned = (selectedDelivery.reward || 0) + (selectedDelivery.tip || 0);
       setWalletBalance(b => b + earned);
       setBonusCoins(c => c + (selectedDelivery.reward || 0));
@@ -898,8 +892,6 @@ export default function App() {
         ...prev,
       ]);
       setLiveDeliveries(prev => prev.filter(d => d.id !== selectedDelivery.id));
-      // Still try to refresh from server in background
-      fetchWallet().catch(() => {});
       handleTab('home');
     }
   };
