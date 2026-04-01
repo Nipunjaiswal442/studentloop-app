@@ -19,7 +19,17 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     const token = getToken();
     const headers: Record<string, string> = { 'Content-Type': 'application/json', ...opts.headers as Record<string, string> };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
+
+    // Bust browser and Vercel edge caches on GET requests to prevent UI glitches
+    const isGet = !opts.method || opts.method.toUpperCase() === 'GET';
+    const cacheBuster = isGet ? (path.includes('?') ? `&_t=${Date.now()}` : `?_t=${Date.now()}`) : '';
+
+    const res = await fetch(`${API_BASE}${path}${cacheBuster}`, { 
+        ...opts, 
+        headers,
+        cache: 'no-store' // Prevent local browser caching
+    });
+
     if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Request failed' }));
         throw new Error(err.error || 'Request failed');
