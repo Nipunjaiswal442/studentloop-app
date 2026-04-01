@@ -174,6 +174,8 @@ export default function App() {
 
   /* ── Restore session on mount ── */
   useEffect(() => {
+    // Wake up Render free-tier backend (fire-and-forget)
+    fetch('/api/health', { cache: 'no-store' }).catch(() => {});
     const token = localStorage.getItem('sl_token');
     if (token) {
       fetchShops();

@@ -24,15 +24,20 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     const isGet = !opts.method || opts.method.toUpperCase() === 'GET';
     const cacheBuster = isGet ? (path.includes('?') ? `&_t=${Date.now()}` : `?_t=${Date.now()}`) : '';
 
-    const res = await fetch(`${API_BASE}${path}${cacheBuster}`, { 
-        ...opts, 
-        headers,
-        cache: 'no-store' // Prevent local browser caching
-    });
+    let res: Response;
+    try {
+        res = await fetch(`${API_BASE}${path}${cacheBuster}`, {
+            ...opts,
+            headers,
+            cache: 'no-store' // Prevent local browser caching
+        });
+    } catch {
+        throw new Error('Cannot reach server — it may be starting up, please try again in a moment.');
+    }
 
     if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(err.error || 'Request failed');
+        const err = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
+        throw new Error(err.error || `Server error (${res.status})`);
     }
     return res.json();
 }
