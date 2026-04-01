@@ -793,18 +793,19 @@ def create_shop():
 NVIDIA_API_KEY = os.environ.get('NVIDIA_API_KEY', '')
 
 @app.route('/api/chat/gemini', methods=['POST'])
-@auth_required
 def chat_gemini():
-    """Proxy chat requests to NVIDIA NIM API (Route kept as /gemini for frontend compatibility)."""
+    """Proxy chat requests to NVIDIA NIM API (Qwen model via NIM).
+    Auth is optional — allows logged-out users to still access help desk."""
     if not NVIDIA_API_KEY:
-        return jsonify({'error': 'NVIDIA API key not configured'}), 500
+        print("[CHATBOT] ERROR: NVIDIA_API_KEY is not set in environment!")
+        return jsonify({'error': 'AI service not configured. Please contact support.'}), 500
 
     data = request.get_json(force=True)
     message = data.get('message', '').strip()
     if not message:
         return jsonify({'error': 'Message is required'}), 400
 
-    # System prompt for StudentLoop context with FAQ injected
+    # System prompt for StudentLoop context
     system_prompt = (
         "You are the StudentLoop AI Assistant. StudentLoop is a peer-to-peer campus delivery platform "
         "where students help each other by delivering food, stationery, medicines, and groceries within "
@@ -813,9 +814,9 @@ def chat_gemini():
         "with all types of scam cases (e.g., fake delivery requests, payment fraud, phishing attempts "
         "on campus). Always prioritize user safety and advise them to report suspicious activity "
         "immediately. Be concise, friendly, and helpful.\n\n"
-        "Here are the rules and FAQ of the platform you must know:\n"
+        "Platform FAQ:\n"
         "- Welcome bonus: ₹500 is credited on sign-up.\n"
-        "- Wallet & Payments: Users add money via UPI. Payments can decline if balance is insufficient. "
+        "- Wallet & Payments: Users add money via UPI. Payments decline if balance is insufficient. "
         "Bonus coins are earned automatically (5% of order amount).\n"
         "- Orders & Delivery: Users browse shops, add to cart, and set tip. The total is deducted and "
         "a request appears on the Dashboard. A 4-digit OTP ensures safe delivery.\n"
@@ -824,54 +825,65 @@ def chat_gemini():
         "Keep answers under 3 sentences unless the user asks for more detail."
     )
 
-    try:
-        url = "https://integrate.api.nvidia.com/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {NVIDIA_API_KEY}",
-            "Accept": "application/json"
-        }
-        
-        payload = {
-            "model": "qwen/qwen3.5-122b-a10b",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": message}
-            ],
-            "max_tokens": 1024,
-            "temperature": 0.60,
-            "top_p": 0.95,
-            "stream": False,
-        }
-        
-        resp = http_requests.post(url, headers=headers, json=payload, timeout=20)
-        resp.raise_for_status()
-        result = resp.json()
+    # Try models in order of preference — fall back if one fails
+    models_to_try = [
+        "qwen/qwen2.5-72b-instruct",
+        "meta/llama-3.1-8b-instruct",
+    ]
 
-        # Extract text from NVIDIA response
-        reply = ''
-        choices = result.get('choices', [])
-        if choices:
-            reply = choices[0].get('message', {}).get('content', '')
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {NVIDIA_API_KEY}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
 
-        if not reply:
-            reply = "I'm sorry, I couldn't generate a response. Please try again."
+    last_error = None
+    for model in models_to_try:
+        try:
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": message}
+                ],
+                "max_tokens": 512,
+                "temperature": 0.60,
+                "top_p": 0.95,
+                "stream": False,
+            }
 
-        return jsonify({'reply': reply})
+            print(f"[CHATBOT] Trying model: {model}")
+            resp = http_requests.post(url, headers=headers, json=payload, timeout=25)
 
-    except http_requests.exceptions.HTTPError as e:
-        err_msg = ""
-        status_code = 500
-        if e.response is not None:
-            err_msg = e.response.text
-            status_code = e.response.status_code
-        else:
-            err_msg = str(e)
-            
-        print(f"NVIDIA API HTTP {status_code}: {err_msg}")
-        return jsonify({'error': f'AI API Error ({status_code}): {err_msg[:200]}...'}), 502
-    except Exception as e:
-        print(f"NVIDIA API error: {e}")
-        return jsonify({'error': 'AI service unavailable. Please try the FAQ instead.'}), 502
+            if not resp.ok:
+                print(f"[CHATBOT] Model {model} failed — HTTP {resp.status_code}: {resp.text[:300]}")
+                last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                continue  # try next model
+
+            result = resp.json()
+            choices = result.get('choices', [])
+            reply = ''
+            if choices:
+                reply = choices[0].get('message', {}).get('content', '').strip()
+
+            if reply:
+                print(f"[CHATBOT] Success with model {model}")
+                return jsonify({'reply': reply})
+            else:
+                print(f"[CHATBOT] Model {model} returned empty content: {result}")
+                last_error = "Empty response from model"
+
+        except http_requests.exceptions.Timeout:
+            print(f"[CHATBOT] Model {model} timed out")
+            last_error = "Request timed out"
+        except Exception as e:
+            print(f"[CHATBOT] Model {model} exception: {e}")
+            last_error = str(e)
+
+    # All models failed
+    print(f"[CHATBOT] All models failed. Last error: {last_error}")
+    return jsonify({'error': f'AI service temporarily unavailable. Please use the FAQ section below.'}), 502
 
 
 # ═══════════════════════════════════════════
