@@ -17,6 +17,54 @@ import {
 import { auth, googleProvider } from './lib/firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 
+/* ── Tiny markdown renderer for T&C content ── */
+function renderMarkdown(text: string) {
+  const renderInline = (str: string, key: number) => {
+    const parts = str.split(/(\*\*[^*]+\*\*)/g);
+    return (
+      <span key={key}>
+        {parts.map((p, i) =>
+          p.startsWith('**') && p.endsWith('**')
+            ? <strong key={i} className="text-gray-200 font-semibold">{p.slice(2, -2)}</strong>
+            : p
+        )}
+      </span>
+    );
+  };
+
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    elements.push(
+      <ul key={`ul-${elements.length}`} className="list-disc list-inside space-y-0.5 mb-1.5 pl-1">
+        {listItems.map((item, i) => <li key={i}>{renderInline(item, i)}</li>)}
+      </ul>
+    );
+    listItems = [];
+  };
+
+  for (const line of text.split('\n')) {
+    if (line.startsWith('## ')) {
+      flushList();
+      elements.push(<h2 key={`h2-${elements.length}`} className="text-xs font-bold text-white mt-2 mb-1">{line.slice(3)}</h2>);
+    } else if (line.startsWith('### ')) {
+      flushList();
+      elements.push(<h3 key={`h3-${elements.length}`} className="text-[11px] font-semibold text-purple-300 mt-2 mb-0.5">{line.slice(4)}</h3>);
+    } else if (line.startsWith('- ')) {
+      listItems.push(line.slice(2));
+    } else if (line.trim() === '') {
+      flushList();
+    } else {
+      flushList();
+      elements.push(<p key={`p-${elements.length}`} className="mb-1">{renderInline(line, 0)}</p>);
+    }
+  }
+  flushList();
+  return elements;
+}
+
 const CatIcon: Record<string, React.ReactNode> = {
   All: <Package size={14} />, Food: <Coffee size={14} />,
   Stationery: <Pencil size={14} />, Medicines: <Pill size={14} />,
@@ -314,8 +362,8 @@ export default function App() {
         {!termsAccepted && (
           <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#09090b]/95 backdrop-blur-xl border-t border-purple-500/20 p-4 animate-slide-up">
             <div className="max-w-lg mx-auto">
-              <div className="glass-card rounded-2xl p-3 text-left max-h-32 overflow-y-auto mb-3 border border-purple-500/20 text-xs text-gray-400 leading-relaxed whitespace-pre-line">
-                {TERMS_AND_CONDITIONS}
+              <div className="glass-card rounded-2xl p-3 text-left max-h-32 overflow-y-auto mb-3 border border-purple-500/20 text-xs text-gray-400 leading-relaxed">
+                {renderMarkdown(TERMS_AND_CONDITIONS)}
               </div>
               <label className="flex items-center gap-3 cursor-pointer mb-3" onClick={() => setTermsCheckbox(!termsCheckbox)}>
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0 ${termsCheckbox ? 'bg-purple-600 border-purple-600' : 'border-gray-500'}`}>
