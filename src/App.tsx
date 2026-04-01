@@ -93,6 +93,10 @@ export default function App() {
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
+  /* ── Profile save state ── */
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+
   /* ── Terms & Conditions ── */
   const [termsAccepted, setTermsAccepted] = useState(() => localStorage.getItem('sl_terms_accepted') === 'true');
   const [termsCheckbox, setTermsCheckbox] = useState(false);
@@ -859,8 +863,16 @@ export default function App() {
     const isStaticDelivery = selectedDelivery.id <= 100;
     if (isStaticDelivery) {
       // Fallback for static/demo deliveries — credit locally
-      setWalletBalance(b => b + selectedDelivery.reward + selectedDelivery.tip);
-      setBonusCoins(c => c + selectedDelivery.reward);
+      const earned = (selectedDelivery.reward || 0) + (selectedDelivery.tip || 0);
+      setWalletBalance(b => b + earned);
+      setBonusCoins(c => c + (selectedDelivery.reward || 0));
+      // Add synthetic transactions so wallet history updates
+      setWalletTxns(prev => [
+        { type: 'credit', amount: selectedDelivery.reward, description: `Delivery reward — #${selectedDelivery.id}`, created_at: new Date().toISOString() },
+        ...(selectedDelivery.tip > 0 ? [{ type: 'credit', amount: selectedDelivery.tip, description: `Tip earned — delivery #${selectedDelivery.id}`, created_at: new Date().toISOString() }] : []),
+        ...prev,
+      ]);
+      setLiveDeliveries(prev => prev.filter(d => d.id !== selectedDelivery.id));
       handleTab('home');
       return;
     }
@@ -870,15 +882,24 @@ export default function App() {
       if (res.user) {
         syncUserToProfile(res.user);
       }
-      // Also refresh wallet transactions so the earning shows in history
+      // Refresh wallet transactions so reward + tip both appear in history
       await fetchWallet();
       // Remove from live list
       setLiveDeliveries(prev => prev.filter(d => d.id !== selectedDelivery.id));
       handleTab('home');
-    } catch (err) {
-      // API error — still credit locally as fallback
-      setWalletBalance(b => b + selectedDelivery.reward + selectedDelivery.tip);
-      setBonusCoins(c => c + selectedDelivery.reward);
+    } catch {
+      // API error — credit locally as fallback and still refresh wallet
+      const earned = (selectedDelivery.reward || 0) + (selectedDelivery.tip || 0);
+      setWalletBalance(b => b + earned);
+      setBonusCoins(c => c + (selectedDelivery.reward || 0));
+      setWalletTxns(prev => [
+        { type: 'credit', amount: selectedDelivery.reward, description: `Delivery reward — #${selectedDelivery.id}`, created_at: new Date().toISOString() },
+        ...(selectedDelivery.tip > 0 ? [{ type: 'credit', amount: selectedDelivery.tip, description: `Tip earned — delivery #${selectedDelivery.id}`, created_at: new Date().toISOString() }] : []),
+        ...prev,
+      ]);
+      setLiveDeliveries(prev => prev.filter(d => d.id !== selectedDelivery.id));
+      // Still try to refresh from server in background
+      fetchWallet().catch(() => {});
       handleTab('home');
     }
   };
@@ -1226,6 +1247,27 @@ export default function App() {
   );
 
   /* ═══════ PROFILE ═══════ */
+  const handleSaveProfile = async () => {
+    setProfileSaving(true);
+    setProfileSaved(false);
+    try {
+      const res = await api.profile.update({
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        mobile: profile.mobile,
+        hostelBlock: profile.hostelBlock,
+        roomNumber: profile.roomNumber,
+      });
+      syncUserToProfile(res.user);
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save profile. Please try again.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen max-w-md mx-auto pb-24 animate-fade-in">
       <div className="px-5 pt-6 pb-2">
@@ -1242,17 +1284,31 @@ export default function App() {
           </div>
         </div>
         {/* Profile Form */}
-        <div className="glass-card rounded-2xl p-4 mb-4 space-y-3">
+        <div className="glass-card rounded-2xl p-4 mb-3 space-y-3">
+          <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">Personal Details</p>
           <div className="grid grid-cols-2 gap-3">
             <input placeholder="First Name" value={profile.firstName} onChange={e => setProfile(p => ({ ...p, firstName: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
             <input placeholder="Last Name" value={profile.lastName} onChange={e => setProfile(p => ({ ...p, lastName: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
           </div>
           <input placeholder="Mobile No." value={profile.mobile} onChange={e => setProfile(p => ({ ...p, mobile: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
-          <input placeholder="Email ID" value={profile.email} onChange={e => setProfile(p => ({ ...p, email: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
+          <input placeholder="Email ID" value={profile.email} disabled className="w-full bg-card/50 border border-border rounded-xl px-3 py-2.5 text-sm text-muted-foreground cursor-not-allowed opacity-60" />
           <div className="grid grid-cols-2 gap-3">
             <input placeholder="Hostel Block" value={profile.hostelBlock} onChange={e => setProfile(p => ({ ...p, hostelBlock: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
             <input placeholder="Room Number" value={profile.roomNumber} onChange={e => setProfile(p => ({ ...p, roomNumber: e.target.value }))} className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50" />
           </div>
+          {/* Save button */}
+          <button
+            onClick={handleSaveProfile}
+            disabled={profileSaving}
+            className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              profileSaved
+                ? 'bg-green-500/20 border border-green-500/30 text-green-400'
+                : 'gradient-purple text-white glow-purple hover:opacity-90 disabled:opacity-40'
+            }`}
+          >
+            {profileSaving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {profileSaved ? <><Check size={16} /> Saved!</> : <><Check size={16} /> Save Profile</>}
+          </button>
         </div>
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-4">
