@@ -327,18 +327,41 @@ app.post('/api/deliveries/:id/accept', auth, (req, res) => {
 
 app.post('/api/deliveries/:id/complete', auth, (req, res) => {
     const delivery = db.prepare('SELECT * FROM delivery_requests WHERE id = ?').get(req.params.id);
-    if (!delivery) return res.status(404).json({ error: 'Not found' });
 
-    db.prepare("UPDATE delivery_requests SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+    let rewardAmt, tipAmt;
+    if (!delivery) {
+        // Static/demo delivery not in DB — use reward+tip from request body
+        const { reward, tip } = req.body;
+        if (reward == null) return res.status(404).json({ error: 'Not found' });
+        rewardAmt = Number(reward) || 0;
+        tipAmt = Number(tip) || 0;
+    } else {
+        rewardAmt = delivery.reward;
+        tipAmt = delivery.tip;
+        db.prepare("UPDATE delivery_requests SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+    }
 
-    // Credit the delivery partner
-    const totalEarning = delivery.reward + delivery.tip;
+    // Idempotency: don't double-credit if already completed
+    const alreadyCredited = db.prepare('SELECT id FROM transactions WHERE reference = ? AND user_id = ?')
+        .get(`delivery_${req.params.id}`, req.userId);
+    if (alreadyCredited) {
+        const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.userId);
+        return res.json({ success: true, earned: 0, user: sanitizeUser(updatedUser) });
+    }
+
+    const totalEarning = rewardAmt + tipAmt;
     db.prepare('UPDATE users SET wallet_balance = wallet_balance + ?, deliveries = deliveries + 1, points = points + ? WHERE id = ?')
-        .run(totalEarning, delivery.reward, req.userId);
+        .run(totalEarning, rewardAmt, req.userId);
+
+    // Insert separate transactions for reward and tip (matches wallet UI display)
     db.prepare('INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)')
-        .run(req.userId, 'credit', totalEarning, `Delivery reward + tip`, `delivery_${req.params.id}`);
+        .run(req.userId, 'credit', rewardAmt, `Delivery reward — #${req.params.id}`, `delivery_${req.params.id}`);
+    if (tipAmt > 0) {
+        db.prepare('INSERT INTO transactions (user_id, type, amount, description, reference) VALUES (?, ?, ?, ?, ?)')
+            .run(req.userId, 'credit', tipAmt, `Tip earned — delivery #${req.params.id}`, `delivery_tip_${req.params.id}`);
+    }
     db.prepare('INSERT INTO activity_log (user_id, action, details, points) VALUES (?, ?, ?, ?)')
-        .run(req.userId, 'delivery_completed', `Completed delivery #${req.params.id}`, delivery.reward);
+        .run(req.userId, 'delivery_completed', `Completed delivery #${req.params.id}`, rewardAmt);
 
     const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.userId);
     res.json({ success: true, earned: totalEarning, user: sanitizeUser(updatedUser) });
@@ -393,6 +416,9 @@ function sanitizeUser(user) {
         createdAt: safe.created_at,
     };
 }
+
+/* ── Health check (used by frontend to wake Render free-tier on startup) ── */
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 /* ── Start ── */
 app.listen(PORT, () => {
