@@ -6,7 +6,7 @@ import {
   MessageCircle, Award, Shield, TrendingUp, Heart, Send, X, Camera, Upload,
   AlertTriangle, Minus, CreditCard, History, Image,
   Eye, EyeOff, Mail, Lock, UserPlus, Globe,
-  HelpCircle, CheckSquare
+  HelpCircle, CheckSquare, Moon, Sun
 } from 'lucide-react';
 import {
   type Screen, type Tab, type CartItem, type Order, type Profile, type Shop, type MenuItem,
@@ -144,6 +144,7 @@ export default function App() {
   /* ── Profile save state ── */
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') !== 'light');
 
   /* ── Terms & Conditions ── */
   const [termsAccepted, setTermsAccepted] = useState(() => localStorage.getItem('sl_terms_accepted') === 'true');
@@ -219,6 +220,12 @@ export default function App() {
     setWalletBalance(u.walletBalance);
     setBonusCoins(u.bonusCoins);
   }, []);
+
+  useEffect(() => {
+    const el = document.documentElement;
+    if (isDark) { el.classList.remove('light'); } else { el.classList.add('light'); }
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
 
   /* ── Restore session on mount ── */
   useEffect(() => {
@@ -1350,6 +1357,17 @@ export default function App() {
           >
             {profileSaving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             {profileSaved ? <><Check size={16} /> Saved!</> : <><Check size={16} /> Save Profile</>}
+          </button>
+        </div>
+        {/* Theme Toggle */}
+        <div className="glass-card rounded-2xl p-4 mb-3 flex items-center gap-3">
+          {isDark ? <Moon size={18} className="text-purple-400" /> : <Sun size={18} className="text-yellow-400" />}
+          <span className="text-sm font-medium flex-1">{isDark ? 'Dark Mode' : 'Light Mode'}</span>
+          <button
+            onClick={() => setIsDark(d => !d)}
+            className={`relative w-12 h-6 rounded-full transition-colors ${isDark ? 'bg-purple-600' : 'bg-gray-300'}`}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isDark ? 'translate-x-6' : 'translate-x-0.5'}`} />
           </button>
         </div>
         {/* Stats */}

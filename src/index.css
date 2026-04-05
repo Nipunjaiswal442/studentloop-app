@@ -41,6 +41,25 @@
   }
 }
 
+/* Light mode overrides — toggled via .light class on <html> */
+.light {
+  --background: 0 0% 98%;
+  --foreground: 260 20% 8%;
+  --card: 0 0% 94%;
+  --card-foreground: 260 20% 8%;
+  --popover: 0 0% 94%;
+  --popover-foreground: 260 20% 8%;
+  --secondary: 260 10% 88%;
+  --secondary-foreground: 260 20% 15%;
+  --muted: 260 10% 88%;
+  --muted-foreground: 260 10% 45%;
+  --border: 260 10% 80%;
+  --input: 260 10% 80%;
+  --dark-bg: 0 0% 96%;
+  --dark-card: 0 0% 92%;
+  --dark-elevated: 0 0% 88%;
+}
+
 @layer base {
   * {
     @apply border-border;
