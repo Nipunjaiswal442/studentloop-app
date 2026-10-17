@@ -43,4 +43,4 @@ export const DEADLINE_OPTIONS = [15, 30, 45, 60, 120];
 export const URGENCY_LABEL = { high: "Urgent", medium: "Soon", low: "Relaxed" } as const;
 
 export const stageTone = (stage: Stage) =>
-  stage === "delivered" ? "success" : stage === "cancelled" ? "danger" : stage === "open" ? "warning" : "primary";
+  stage === "delivered" ? "solid" : stage === "cancelled" ? "danger" : stage === "open" ? "warning" : "primary";

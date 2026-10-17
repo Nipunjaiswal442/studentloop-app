@@ -1,11 +1,13 @@
-import Google from "@auth/core/providers/google";
+import { ConvexCredentials } from "@convex-dev/auth/providers/ConvexCredentials";
 import { Password } from "@convex-dev/auth/providers/Password";
-import { convexAuth } from "@convex-dev/auth/server";
+import { convexAuth, createAccount } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
-import { SIGNUP_POINTS, WELCOME_BONUS } from "./lib/constants";
+import { createOrUpdateUserImpl } from "./lib/accounts";
+import { friendlyPasswordError } from "./lib/authErrors";
+import { verifyForThisProject } from "./lib/firebase";
 
-const PasswordProvider = Password({
+const basePassword = Password({
   profile(params) {
     const profile: { email: string; name?: string } = {
       email: String(params.email ?? "").trim().toLowerCase(),
@@ -20,65 +22,64 @@ const PasswordProvider = Password({
   },
 });
 
+/**
+ * The stock Password provider, with its errors made readable. Its authorize
+ * function lives on `options`; the library version is pinned, and this fails at
+ * deploy time (not silently) if that ever changes.
+ */
+const passwordOptions = (
+  basePassword as unknown as {
+    options?: Parameters<typeof ConvexCredentials>[0];
+  }
+).options;
+if (typeof passwordOptions?.authorize !== "function") {
+  throw new Error("Unsupported @convex-dev/auth version: cannot wrap the Password provider.");
+}
+const passwordProvider = ConvexCredentials({
+  ...passwordOptions,
+  authorize: async (params, ctx) => {
+    try {
+      return await passwordOptions.authorize(params, ctx);
+    } catch (error) {
+      throw friendlyPasswordError(error, params.flow);
+    }
+  },
+});
+
+/**
+ * Google sign-in through Firebase. The browser sends the Firebase ID token and
+ * we verify it ourselves; nothing the client says about who it is is trusted.
+ */
+const firebaseProvider = ConvexCredentials({
+  id: "firebase",
+  authorize: async (credentials, ctx) => {
+    const identity = await verifyForThisProject(String(credentials.idToken ?? ""));
+    const { user } = await createAccount(ctx, {
+      provider: "firebase",
+      account: { id: identity.uid },
+      profile: {
+        email: identity.email,
+        emailVerified: true,
+        ...(identity.name ? { name: identity.name } : {}),
+        ...(identity.picture ? { image: identity.picture } : {}),
+      },
+      shouldLinkViaEmail: false,
+      shouldLinkViaPhone: false,
+    });
+    return { userId: user._id };
+  },
+});
+
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-  providers: [Google, PasswordProvider],
+  providers: [passwordProvider, firebaseProvider],
   callbacks: {
     async createOrUpdateUser(authCtx, args) {
-      if (args.existingUserId) return args.existingUserId;
       // The auth library hands over an untyped context; ours knows the schema.
-      const ctx = authCtx as unknown as MutationCtx;
-
-      const email =
-        typeof args.profile.email === "string" ? args.profile.email.trim().toLowerCase() : "";
-      if (!email) throw new ConvexError("An email address is required.");
-
-      // Accounts are never merged by email: that would let someone who
-      // pre-registers an address with a password take over the same address
-      // when its owner later signs in with Google.
-      const clash = await ctx.db
-        .query("users")
-        .withIndex("email", (q) => q.eq("email", email))
-        .first();
-      if (clash) {
-        throw new ConvexError(
-          "An account with this email already exists. Sign in the way you first did.",
-        );
-      }
-
-      const name = typeof args.profile.name === "string" ? args.profile.name.trim() : "";
-      const [firstName = "", ...rest] = name.split(/\s+/).filter(Boolean);
-
-      const userId = await ctx.db.insert("users", {
-        email,
-        name: name || undefined,
-        image: typeof args.profile.image === "string" ? args.profile.image : undefined,
-        firstName,
-        lastName: rest.join(" "),
-        mobile: "",
-        hostelBlock: "",
-        roomNumber: "",
-        walletBalance: WELCOME_BONUS,
-        bonusCoins: 0,
-        points: SIGNUP_POINTS,
-        deliveries: 0,
-        trustScore: 80,
-        rating: 0,
-        ratingCount: 0,
+      return await createOrUpdateUserImpl(authCtx as unknown as MutationCtx, {
+        existingUserId: args.existingUserId,
+        provider: args.provider.id,
+        profile: args.profile,
       });
-      await ctx.db.insert("transactions", {
-        userId,
-        type: "credit",
-        kind: "welcome",
-        amount: WELCOME_BONUS,
-        description: "Welcome bonus",
-      });
-      await ctx.db.insert("activity", {
-        userId,
-        action: "account_created",
-        details: "Joined StudentLoop",
-        points: SIGNUP_POINTS,
-      });
-      return userId;
     },
   },
 });

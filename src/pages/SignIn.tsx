@@ -1,12 +1,15 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { ConvexError } from "convex/values";
-import { Eye, EyeOff, PackageCheck, ShieldCheck, Wallet } from "lucide-react";
+import { Eye, EyeOff, PackageCheck, ShieldCheck, TriangleAlert, Wallet } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button, Field, Input } from "@/components/ui";
+import { googleErrorMessage } from "@/lib/errors";
+import { firebaseConfigured, getGoogleIdToken } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 
 const PERKS = [
@@ -14,6 +17,9 @@ const PERKS = [
   { icon: PackageCheck, text: "Order from campus shops or earn by delivering" },
   { icon: ShieldCheck, text: "Payments are held until you confirm the handoff" },
 ];
+
+const SESSION_REJECTED =
+  "You were signed in, but the server did not accept the session. This is a server setup problem, not your password: the site owner should check the auth keys (see the README).";
 
 function GoogleMark() {
   return (
@@ -35,10 +41,23 @@ export default function SignIn() {
 
   const mode = params.get("mode") === "signup" ? "signUp" : "signIn";
   const from = (location.state as { from?: string } | null)?.from ?? "/shops";
+  const googleAvailable = firebaseConfigured && options?.google === true;
 
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [awaitingSession, setAwaitingSession] = useState(false);
+
+  // Signing in succeeded but the backend never accepted the session token:
+  // say so, instead of leaving the form looking like nothing happened.
+  useEffect(() => {
+    if (!awaitingSession || isAuthenticated) return;
+    const timer = setTimeout(() => {
+      setAwaitingSession(false);
+      setError(SESSION_REJECTED);
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [awaitingSession, isAuthenticated]);
 
   if (isAuthenticated) return <Navigate to={from} replace />;
 
@@ -55,14 +74,13 @@ export default function SignIn() {
     setError("");
     setPending(true);
     try {
-      await signIn("password", data);
+      const result = await signIn("password", data);
+      if (result.signingIn) setAwaitingSession(true);
     } catch (err) {
       setError(
         err instanceof ConvexError && typeof err.data === "string"
           ? err.data
-          : mode === "signIn"
-            ? "Incorrect email or password."
-            : "We couldn't create that account. The email may already be registered.",
+          : "Something went wrong on our side. Please try again in a moment.",
       );
     } finally {
       setPending(false);
@@ -71,12 +89,19 @@ export default function SignIn() {
 
   async function onGoogle() {
     setError("");
+    setPending(true);
     try {
-      await signIn("google", { redirectTo: from });
-    } catch {
-      setError("Google sign-in didn't start. Please try again.");
+      const idToken = await getGoogleIdToken();
+      const result = await signIn("firebase", { idToken });
+      if (result.signingIn) setAwaitingSession(true);
+    } catch (err) {
+      setError(googleErrorMessage(err) ?? "");
+    } finally {
+      setPending(false);
     }
   }
+
+  const setupMissing = options && options.missing.length > 0 ? options.missing : null;
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-2">
@@ -100,7 +125,8 @@ export default function SignIn() {
         <p className="text-sm text-muted-foreground">Built for campus life.</p>
       </aside>
 
-      <main className="flex flex-col justify-center px-5 py-10 sm:px-10">
+      <main className="relative flex flex-col justify-center px-5 py-10 sm:px-10">
+        <ThemeToggle className="absolute right-4 top-4" />
         <div className="mx-auto w-full max-w-sm">
           <Logo className="mb-10 lg:hidden" />
 
@@ -110,6 +136,16 @@ export default function SignIn() {
           <p className="mt-1 text-sm text-muted-foreground">
             {mode === "signIn" ? "Sign in to order, deliver and track." : "It takes under a minute."}
           </p>
+
+          {setupMissing && (
+            <p role="status" className="mt-5 flex gap-2 rounded-lg bg-warning-soft p-3 text-sm text-warning">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>
+                Sign-in isn't fully set up on this server yet (missing {setupMissing.join(", ")}). If you run this
+                site, see the README.
+              </span>
+            </p>
+          )}
 
           <div role="tablist" aria-label="Account" className="mt-6 grid grid-cols-2 rounded-lg bg-subtle p-1">
             {(["signIn", "signUp"] as const).map((m) => (
@@ -129,7 +165,27 @@ export default function SignIn() {
             ))}
           </div>
 
-          <form onSubmit={(e) => void onSubmit(e)} className="mt-6 space-y-4">
+          {googleAvailable && (
+            <>
+              <Button
+                variant="secondary"
+                size="lg"
+                className="mt-6 w-full"
+                disabled={pending}
+                onClick={() => void onGoogle()}
+              >
+                <GoogleMark />
+                Continue with Google
+              </Button>
+              <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                or use email
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            </>
+          )}
+
+          <form onSubmit={(e) => void onSubmit(e)} className={cn("space-y-4", !googleAvailable && "mt-6")}>
             {mode === "signUp" && (
               <Field label="Full name">
                 {(id) => (
@@ -174,29 +230,18 @@ export default function SignIn() {
             </Field>
 
             {error && (
-              <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
-                {error}
-              </p>
+              <div role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+                <p>{error}</p>
+                {mode === "signIn" && googleAvailable && /Incorrect email or password/.test(error) && (
+                  <p className="mt-1 text-xs">Signed up with Google? Choose Continue with Google above.</p>
+                )}
+              </div>
             )}
 
             <Button type="submit" size="lg" className="w-full" loading={pending}>
               {mode === "signIn" ? "Sign in" : "Create account"}
             </Button>
           </form>
-
-          {options?.google && (
-            <>
-              <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="h-px flex-1 bg-border" />
-                or
-                <span className="h-px flex-1 bg-border" />
-              </div>
-              <Button variant="secondary" size="lg" className="w-full" onClick={() => void onGoogle()}>
-                <GoogleMark />
-                Continue with Google
-              </Button>
-            </>
-          )}
 
           <p className="mt-8 text-center text-xs text-muted-foreground">
             By continuing you agree to our{" "}

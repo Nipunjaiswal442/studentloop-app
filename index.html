@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#4F46E5" />
+    <meta name="theme-color" content="#047857" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a1411" media="(prefers-color-scheme: dark)" />
     <meta
       name="description"
       content="StudentLoop is a campus delivery network. Order from campus shops, post errands, or earn by delivering for other students."
@@ -23,9 +24,12 @@
       rel="stylesheet"
     />
     <script>
-      // Apply the saved theme before first paint to avoid a flash.
+      // Apply the theme before first paint to avoid a flash: the saved choice,
+      // otherwise the system setting.
       try {
-        if (localStorage.getItem('sl_theme') === 'dark') document.documentElement.classList.add('dark');
+        var saved = localStorage.getItem('sl_theme');
+        var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (dark) document.documentElement.classList.add('dark');
       } catch (e) {}
     </script>
   </head>

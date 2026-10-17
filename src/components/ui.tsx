@@ -183,6 +183,7 @@ const tones = {
   success: "bg-success-soft text-success",
   warning: "bg-warning-soft text-warning",
   danger: "bg-danger-soft text-danger",
+  solid: "bg-primary text-primary-foreground",
 } as const;
 
 export function Badge({

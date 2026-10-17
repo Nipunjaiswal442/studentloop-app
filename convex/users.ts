@@ -33,11 +33,15 @@ export const me = query({
   },
 });
 
-/** Which sign-in options this deployment has configured. Safe to call signed out. */
+/**
+ * What this deployment has configured, so the sign-in page can say so instead
+ * of failing mysteriously. Safe signed out: it reports names, never values.
+ */
 export const signInOptions = query({
   args: {},
   handler: async () => ({
-    google: Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET),
+    google: Boolean(process.env.FIREBASE_PROJECT_ID),
+    missing: ["JWT_PRIVATE_KEY", "JWKS", "SITE_URL"].filter((name) => !process.env[name]),
   }),
 });
 

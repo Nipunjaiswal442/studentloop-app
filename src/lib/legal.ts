@@ -47,11 +47,15 @@ export const FAQ: { topic: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "How do I sign up?",
-        a: "Create an account with your email and a password, or continue with Google. New accounts get a ₹500 welcome bonus in their wallet.",
+        a: "Create an account with your email and a password, or tap Continue with Google. New accounts get a ₹500 welcome bonus in their wallet.",
       },
       {
         q: "How do I reset my password?",
-        a: "Self-service reset isn't available yet. Email support@studentloop.com and we'll help.",
+        a: "Self-service reset isn't available yet. If your email is a Google account, Continue with Google signs you in to the same account (and replaces the old password). Otherwise email support@studentloop.com and we'll help.",
+      },
+      {
+        q: "Why does it say my email is already registered?",
+        a: "An account already exists for that email. Use the Sign in tab instead of Sign up. After about ten wrong passwords, sign-in for that account pauses for up to an hour. If you're locked out, try Continue with Google or email support@studentloop.com.",
       },
       {
         q: "What is the trust score?",

@@ -14,6 +14,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { LinkButton } from "@/components/ui";
 
 const STEPS = [
@@ -91,7 +92,8 @@ export default function Landing() {
             <a href="#features" className="hover:text-foreground">Features</a>
             <a href="#safety" className="hover:text-foreground">Safety</a>
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <ThemeToggle />
             {isAuthenticated ? (
               <LinkButton to="/shops">Open app</LinkButton>
             ) : (
@@ -231,12 +233,12 @@ export default function Landing() {
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
           <div className="rounded-2xl bg-primary px-6 py-12 text-center text-primary-foreground sm:px-12">
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Start with your first order</h2>
-            <p className="mx-auto mt-3 max-w-lg text-primary-foreground/80">
+            <p className="mx-auto mt-3 max-w-lg text-primary-foreground">
               Sign up, use your welcome bonus, and see how it feels to have campus come to you.
             </p>
             <Link
               to={isAuthenticated ? "/shops" : "/signin?mode=signup"}
-              className="mt-8 inline-flex h-12 items-center rounded-lg bg-white px-6 font-semibold text-primary hover:bg-white/90"
+              className="mt-8 inline-flex h-12 items-center rounded-lg bg-primary-foreground px-6 font-semibold text-primary hover:bg-primary-foreground/90"
             >
               {isAuthenticated ? "Open the app" : "Create a free account"}
             </Link>
