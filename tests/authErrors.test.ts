@@ -1,6 +1,6 @@
 import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
-import { friendlyPasswordError } from "../convex/lib/authErrors";
+import { ACCOUNT_EXISTS, friendlyPasswordError } from "../convex/lib/authErrors";
 
 const text = (e: unknown) => (e instanceof ConvexError ? (e.data as string) : null);
 
@@ -8,6 +8,7 @@ describe("friendlyPasswordError", () => {
   it("explains a lockout instead of calling it a wrong password", () => {
     const e = friendlyPasswordError(new Error("TooManyFailedAttempts"), "signIn");
     expect(text(e)).toMatch(/Too many failed attempts/);
+    expect(text(e)).toMatch(/few minutes/);
   });
 
   it("recognises the lockout inside a decorated server error", () => {
@@ -21,7 +22,7 @@ describe("friendlyPasswordError", () => {
 
   it("maps an existing account on sign-up", () => {
     const e = friendlyPasswordError(new Error("Uncaught Error: Account a@b.com already exists"), "signUp");
-    expect(text(e)).toMatch(/already exists/);
+    expect(text(e)).toBe(ACCOUNT_EXISTS);
   });
 
   it("does not claim a duplicate email for unrelated failures", () => {
@@ -35,6 +36,11 @@ describe("friendlyPasswordError", () => {
     expect(friendlyPasswordError(exists, "signIn")).toBe(exists);
     const invalid = new Error("InvalidSecret");
     expect(friendlyPasswordError(invalid, "signUp")).toBe(invalid);
+  });
+
+  it("is not fooled by a user-chosen email that contains an error keyword", () => {
+    const sneaky = new Error("Account TooManyFailedAttempts@x.com already exists");
+    expect(text(friendlyPasswordError(sneaky, "signUp"))).toBe(ACCOUNT_EXISTS);
   });
 
   it("passes our own errors through untouched", () => {

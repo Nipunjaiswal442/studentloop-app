@@ -2,14 +2,13 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { ConvexError } from "convex/values";
 import { Eye, EyeOff, PackageCheck, ShieldCheck, TriangleAlert, Wallet } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button, Field, Input } from "@/components/ui";
-import { googleErrorMessage } from "@/lib/errors";
-import { firebaseConfigured, getGoogleIdToken } from "@/lib/firebase";
+import { errorMessage, googleErrorMessage } from "@/lib/errors";
+import { firebaseConfigured, getGoogleIdToken, preloadFirebase } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 
 const PERKS = [
@@ -42,11 +41,19 @@ export default function SignIn() {
   const mode = params.get("mode") === "signup" ? "signUp" : "signIn";
   const from = (location.state as { from?: string } | null)?.from ?? "/shops";
   const googleAvailable = firebaseConfigured && options?.google === true;
+  // Keep the button's place while we find out, so the form doesn't jump.
+  const googleLoading = firebaseConfigured && options === undefined;
 
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [awaitingSession, setAwaitingSession] = useState(false);
+
+  // Start downloading the Firebase SDK now, so the popup can open straight from
+  // the tap (browsers may block a popup that has to wait after the tap).
+  useEffect(() => {
+    if (googleAvailable) preloadFirebase();
+  }, [googleAvailable]);
 
   // Signing in succeeded but the backend never accepted the session token:
   // say so, instead of leaving the form looking like nothing happened.
@@ -72,16 +79,13 @@ export default function SignIn() {
     data.set("email", String(data.get("email") ?? "").trim().toLowerCase());
     data.set("flow", mode);
     setError("");
+    setAwaitingSession(false);
     setPending(true);
     try {
       const result = await signIn("password", data);
       if (result.signingIn) setAwaitingSession(true);
     } catch (err) {
-      setError(
-        err instanceof ConvexError && typeof err.data === "string"
-          ? err.data
-          : "Something went wrong on our side. Please try again in a moment.",
-      );
+      setError(errorMessage(err, "Something went wrong on our side. Please try again in a moment."));
     } finally {
       setPending(false);
     }
@@ -89,13 +93,18 @@ export default function SignIn() {
 
   async function onGoogle() {
     setError("");
+    setAwaitingSession(false);
     setPending(true);
     try {
       const idToken = await getGoogleIdToken();
       const result = await signIn("firebase", { idToken });
       if (result.signingIn) setAwaitingSession(true);
     } catch (err) {
-      setError(googleErrorMessage(err) ?? "");
+      const message = googleErrorMessage(err);
+      // Unknown failures (provider not enabled, bad web config) are for the site
+      // owner: put the real reason in the browser console.
+      if (message?.startsWith("Google sign-in didn't work")) console.error("Google sign-in failed:", err);
+      setError(message ?? "");
     } finally {
       setPending(false);
     }
@@ -165,6 +174,19 @@ export default function SignIn() {
             ))}
           </div>
 
+          {googleLoading && (
+            <>
+              <Button variant="secondary" size="lg" className="mt-6 w-full" disabled>
+                <GoogleMark />
+                Continue with Google
+              </Button>
+              <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                or use email
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            </>
+          )}
           {googleAvailable && (
             <>
               <Button
@@ -185,11 +207,14 @@ export default function SignIn() {
             </>
           )}
 
-          <form onSubmit={(e) => void onSubmit(e)} className={cn("space-y-4", !googleAvailable && "mt-6")}>
+          <form
+            onSubmit={(e) => void onSubmit(e)}
+            className={cn("space-y-4", !googleAvailable && !googleLoading && "mt-6")}
+          >
             {mode === "signUp" && (
               <Field label="Full name">
                 {(id) => (
-                  <Input id={id} name="name" required autoComplete="name" placeholder="Ananya Sharma" />
+                  <Input id={id} name="name" required maxLength={80} autoComplete="name" placeholder="Ananya Sharma" />
                 )}
               </Field>
             )}
@@ -245,7 +270,7 @@ export default function SignIn() {
 
           <p className="mt-8 text-center text-xs text-muted-foreground">
             By continuing you agree to our{" "}
-            <Link to="/terms" className="text-primary hover:underline">
+            <Link to="/terms" className="text-primary underline underline-offset-2 hover:no-underline">
               Terms
             </Link>
             .

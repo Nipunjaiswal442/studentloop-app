@@ -238,7 +238,7 @@ export default function Landing() {
             </p>
             <Link
               to={isAuthenticated ? "/shops" : "/signin?mode=signup"}
-              className="mt-8 inline-flex h-12 items-center rounded-lg bg-primary-foreground px-6 font-semibold text-primary hover:bg-primary-foreground/90"
+              className="mt-8 inline-flex h-12 items-center rounded-lg bg-primary-foreground px-6 font-semibold text-primary hover:bg-primary-foreground/90 focus-visible:ring-primary-foreground focus-visible:ring-offset-primary"
             >
               {isAuthenticated ? "Open the app" : "Create a free account"}
             </Link>

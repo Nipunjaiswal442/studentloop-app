@@ -1,18 +1,21 @@
 import { ConvexCredentials } from "@convex-dev/auth/providers/ConvexCredentials";
 import { Password } from "@convex-dev/auth/providers/Password";
-import { convexAuth, createAccount } from "@convex-dev/auth/server";
+import { convexAuth, createAccount, retrieveAccount } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
 import { createOrUpdateUserImpl } from "./lib/accounts";
 import { friendlyPasswordError } from "./lib/authErrors";
+import { normalizeEmail } from "./lib/email";
 import { verifyForThisProject } from "./lib/firebase";
+import { rejectExistingSignUp } from "./lib/passwordGuard";
+
+const NAME_MAX = 80;
 
 const basePassword = Password({
   profile(params) {
-    const profile: { email: string; name?: string } = {
-      email: String(params.email ?? "").trim().toLowerCase(),
-    };
-    if (typeof params.name === "string" && params.name.trim()) profile.name = params.name.trim();
+    const profile: { email: string; name?: string } = { email: normalizeEmail(params.email) };
+    const name = typeof params.name === "string" ? params.name.trim().slice(0, NAME_MAX) : "";
+    if (name) profile.name = name;
     return profile;
   },
   validatePasswordRequirements(password: string) {
@@ -39,6 +42,9 @@ const passwordProvider = ConvexCredentials({
   ...passwordOptions,
   authorize: async (params, ctx) => {
     try {
+      await rejectExistingSignUp(params, (id) =>
+        retrieveAccount(ctx, { provider: "password", account: { id } }),
+      );
       return await passwordOptions.authorize(params, ctx);
     } catch (error) {
       throw friendlyPasswordError(error, params.flow);
@@ -66,6 +72,8 @@ const firebaseProvider = ConvexCredentials({
       shouldLinkViaEmail: false,
       shouldLinkViaPhone: false,
     });
+    // Only null if the users row was deleted while its account was kept.
+    if (!user) throw new ConvexError("This account is no longer available. Please contact support.");
     return { userId: user._id };
   },
 });

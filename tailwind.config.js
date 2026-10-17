@@ -13,6 +13,7 @@ export default {
         card: 'hsl(var(--card) / <alpha-value>)',
         subtle: 'hsl(var(--subtle) / <alpha-value>)',
         border: 'hsl(var(--border) / <alpha-value>)',
+        control: 'hsl(var(--control) / <alpha-value>)',
         'muted-foreground': 'hsl(var(--muted-foreground) / <alpha-value>)',
         primary: {
           DEFAULT: 'hsl(var(--primary) / <alpha-value>)',

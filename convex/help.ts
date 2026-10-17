@@ -1,4 +1,4 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthSessionId, getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalMutation } from "./_generated/server";
@@ -23,8 +23,12 @@ Help with questions about the app and basic safety on campus, including spotting
 
 /** Throws when the user has made too many assistant calls in the last minute. */
 export const recordCall = internalMutation({
-  args: { userId: v.id("users") },
-  handler: async (ctx, { userId }) => {
+  args: { userId: v.id("users"), sessionId: v.id("authSessions") },
+  handler: async (ctx, { userId, sessionId }) => {
+    const session = await ctx.db.get(sessionId);
+    if (!session || session.userId !== userId) {
+      throw new ConvexError("Your session has ended. Please sign in again.");
+    }
     const hourAgo = Date.now() - 60 * 60 * 1000;
     const minuteAgo = Date.now() - 60 * 1000;
     const recent = await ctx.db
@@ -52,7 +56,8 @@ export const ask = action({
   },
   handler: async (ctx, args): Promise<{ reply: string }> => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new ConvexError("Please sign in to continue.");
+    const sessionId = await getAuthSessionId(ctx);
+    if (!userId || !sessionId) throw new ConvexError("Please sign in to continue.");
 
     const apiKey = process.env.NVIDIA_API_KEY;
     if (!apiKey) {
@@ -62,7 +67,7 @@ export const ask = action({
     if (!message || message.length > 500) {
       throw new ConvexError("Messages must be between 1 and 500 characters.");
     }
-    await ctx.runMutation(internal.help.recordCall, { userId });
+    await ctx.runMutation(internal.help.recordCall, { userId, sessionId });
 
     const history = args.history.slice(-6).map((m) => ({
       role: m.role,

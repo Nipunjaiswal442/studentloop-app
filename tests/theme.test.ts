@@ -43,9 +43,25 @@ const TEXT_PAIRS: [string, string][] = [
   ["primary-soft-foreground", "primary-soft"],
   ["success", "success-soft"],
   ["success", "card"],
+  ["success", "subtle"],
   ["warning", "warning-soft"],
+  ["warning", "card"],
   ["danger", "danger-soft"],
   ["danger", "card"],
+  ["danger", "subtle"],
+  // Chips, badges and nav items sit on tinted surfaces too.
+  ["primary-soft-foreground", "subtle"],
+  ["muted-foreground", "primary-soft"],
+];
+
+/**
+ * [boundary token, surface token]: borders of inputs, choice chips and empty
+ * rating stars. WCAG 1.4.11 asks 3:1 for the edge of a control.
+ */
+const CONTROL_PAIRS: [string, string][] = [
+  ["control", "background"],
+  ["control", "card"],
+  ["control", "subtle"],
 ];
 
 describe.each([
@@ -63,6 +79,17 @@ describe.each([
 
   it.each(TEXT_PAIRS)("%s on %s", (fg, bg) => {
     expect(contrast(t[fg], t[bg])).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe.each([
+  ["light", ":root"],
+  ["dark", "\\.dark"],
+])("%s theme control borders meet 3:1", (_name, selector) => {
+  const t = tokens(selector);
+  it.each(CONTROL_PAIRS)("%s on %s", (edge, surface) => {
+    expect(t[edge], `--${edge}`).toBeDefined();
+    expect(contrast(t[edge], t[surface])).toBeGreaterThanOrEqual(3);
   });
 });
 

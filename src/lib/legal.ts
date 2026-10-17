@@ -55,7 +55,7 @@ export const FAQ: { topic: string; items: { q: string; a: string }[] }[] = [
       },
       {
         q: "Why does it say my email is already registered?",
-        a: "An account already exists for that email. Use the Sign in tab instead of Sign up. After about ten wrong passwords, sign-in for that account pauses for up to an hour. If you're locked out, try Continue with Google or email support@studentloop.com.",
+        a: "An account already exists for that email. Use the Sign in tab instead of Sign up. After about ten wrong passwords, sign-in for that account pauses for a few minutes, even for the right password. If you're locked out, wait a little, try Continue with Google, or email support@studentloop.com.",
       },
       {
         q: "What is the trust score?",

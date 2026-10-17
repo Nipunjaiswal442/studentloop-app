@@ -41,7 +41,11 @@ async function makeUser(t: T, name: string, balance = 500) {
       ratingCount: 0,
     }),
   );
-  return { id, as: t.withIdentity({ subject: `${id}|session` }) };
+  // requireUser checks the session row, so tests sign in with a real one.
+  const sessionId = await t.run((ctx) =>
+    ctx.db.insert("authSessions", { userId: id, expirationTime: Date.now() + 1e9 }),
+  );
+  return { id, sessionId, as: t.withIdentity({ subject: `${id}|${sessionId}` }) };
 }
 
 async function makeShop(t: T) {
@@ -413,6 +417,31 @@ describe("wallet", () => {
       0,
     );
     expect(net).toBe(summary.balance);
+  });
+});
+
+describe("ended sessions", () => {
+  it("stop working at once, even though the access token has not expired", async () => {
+    const t = setup();
+    const alice = await makeUser(t, "Alice", 500);
+    expect((await alice.as.query(api.users.me, {}))?.walletBalance).toBe(500);
+
+    // e.g. Google took over the account, or the owner reset the password.
+    await t.run((ctx) => ctx.db.delete(alice.sessionId));
+
+    expect(await alice.as.query(api.users.me, {})).toBeNull();
+    await expect(alice.as.query(api.wallet.summary, {})).rejects.toThrow(/session has ended/);
+    await expect(alice.as.mutation(api.wallet.topUp, { amount: 100 })).rejects.toThrow(
+      /session has ended/,
+    );
+  });
+
+  it("do not let a session of one user act as another", async () => {
+    const t = setup();
+    const alice = await makeUser(t, "Alice");
+    const bob = await makeUser(t, "Bob");
+    const crossed = t.withIdentity({ subject: `${alice.id}|${bob.sessionId}` });
+    await expect(crossed.query(api.wallet.summary, {})).rejects.toThrow(/session has ended/);
   });
 });
 

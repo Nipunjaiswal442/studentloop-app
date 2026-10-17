@@ -12,6 +12,8 @@ export type FirebaseIdentity = {
 };
 
 const REJECTED = "Google sign-in could not be verified. Please try again.";
+/** The token must come from a login in the last ten minutes: we exchange it immediately. */
+const MAX_LOGIN_AGE_SECONDS = 10 * 60;
 
 /**
  * Verifies a Firebase ID token the way Firebase documents it: RS256 signature
@@ -34,7 +36,10 @@ export async function verifyFirebaseIdToken(
       clockTolerance: 5,
     }));
   } catch (error) {
-    console.error("Firebase ID token rejected:", error instanceof Error ? error.message : error);
+    console.error(
+      `Firebase ID token rejected (server expects project "${options.projectId}"):`,
+      error instanceof Error ? error.message : error,
+    );
     throw new ConvexError(REJECTED);
   }
 
@@ -51,7 +56,8 @@ export async function verifyFirebaseIdToken(
     payload.email_verified === true &&
     firebase?.sign_in_provider === "google.com" &&
     typeof payload.auth_time === "number" &&
-    payload.auth_time <= now + 5;
+    payload.auth_time <= now + 5 &&
+    payload.auth_time >= now - MAX_LOGIN_AGE_SECONDS;
   if (!valid) {
     console.error("Firebase ID token has unexpected claims", {
       hasUid: Boolean(uid),

@@ -8,14 +8,25 @@ const config = {
 /** True when the Firebase web config is present in this build. */
 export const firebaseConfigured = Boolean(config.apiKey && config.authDomain && config.projectId);
 
+const loadSdk = () => Promise.all([import("@firebase/app"), import("@firebase/auth")]);
+
+/**
+ * Starts downloading the Firebase SDK. Called when the sign-in page opens so the
+ * popup can open straight from the tap: browsers (iOS Safari especially) may
+ * block a popup that has to wait for a download after the tap.
+ */
+export function preloadFirebase() {
+  if (firebaseConfigured) void loadSdk().catch(() => undefined);
+}
+
 /**
  * Opens Google's account chooser through Firebase and returns a Firebase ID
  * token. Firebase is used only to prove who the person is: the server verifies
- * the token, and the session itself is Convex's. The SDK loads on first use.
+ * the token, and the session itself is Convex's.
  */
 export async function getGoogleIdToken(): Promise<string> {
   const [{ getApp, getApps, initializeApp }, { GoogleAuthProvider, getAuth, signInWithPopup, signOut }] =
-    await Promise.all([import("firebase/app"), import("firebase/auth")]);
+    await loadSdk();
 
   const app = getApps().length > 0 ? getApp() : initializeApp(config);
   const auth = getAuth(app);

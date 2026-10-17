@@ -11,6 +11,7 @@ type Profile = {
   emailVerified?: unknown;
 };
 
+const NAME_MAX = 80;
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
 
 /**
@@ -65,7 +66,7 @@ async function firstAccount(ctx: MutationCtx, userId: Id<"users">, provider: str
 }
 
 async function createUser(ctx: MutationCtx, email: string, profile: Profile) {
-  const name = str(profile.name) ?? "";
+  const name = (str(profile.name) ?? "").slice(0, NAME_MAX);
   const [firstName = "", ...rest] = name.split(/\s+/).filter(Boolean);
 
   const userId = await ctx.db.insert("users", {
@@ -128,20 +129,27 @@ async function adoptExistingUser(ctx: MutationCtx, user: Doc<"users">, profile: 
     await ctx.db.delete(session._id);
   }
 
-  const name = str(profile.name);
+  const name = str(profile.name)?.slice(0, NAME_MAX);
   const [firstName = "", ...rest] = (name ?? "").split(/\s+/).filter(Boolean);
   await ctx.db.patch(user._id, {
     emailVerificationTime: user.emailVerificationTime ?? Date.now(),
-    ...(!user.name && name ? { name } : {}),
-    ...(!user.image && str(profile.image) ? { image: str(profile.image) } : {}),
-    ...(!user.firstName && firstName ? { firstName, lastName: user.lastName || rest.join(" ") } : {}),
+    // Contact details and consent were entered by whoever registered the address
+    // first, which may not be its owner. The owner re-enters them and accepts the
+    // terms themselves; the wallet and history stay.
+    mobile: "",
+    hostelBlock: "",
+    roomNumber: "",
+    termsAcceptedAt: undefined,
+    // Google has verified this name; the pre-registrant's is not trusted.
+    ...(name ? { name, firstName, lastName: rest.join(" ") } : {}),
+    ...(str(profile.image) ? { image: str(profile.image) } : {}),
   });
   await ctx.db.insert("activity", {
     userId: user._id,
     action: "google_linked",
     details:
       passwords.length > 0
-        ? "Google sign-in linked. Your old password was removed."
+        ? "Google sign-in linked. Your old password and saved contact details were removed."
         : "Google sign-in linked to your account.",
     points: 0,
   });

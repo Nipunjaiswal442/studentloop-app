@@ -2,6 +2,7 @@ import { invalidateSessions, modifyAccountCredentials, retrieveAccount } from "@
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
+import { normalizeEmail } from "./lib/email";
 
 /**
  * Owner tools for account recovery. These are internal: browsers cannot call
@@ -17,7 +18,7 @@ export const clearSignInLockout = internalMutation({
     const account = await ctx.db
       .query("authAccounts")
       .withIndex("providerAndAccountId", (q) =>
-        q.eq("provider", "password").eq("providerAccountId", email.trim().toLowerCase()),
+        q.eq("provider", "password").eq("providerAccountId", normalizeEmail(email)),
       )
       .unique();
     if (!account) return "No password account for that email.";
@@ -36,11 +37,16 @@ export const resetPassword = internalAction({
     if (password.length < 8 || password.length > 128) {
       throw new ConvexError("Password must be 8 to 128 characters long.");
     }
-    const id = email.trim().toLowerCase();
-    const found = await retrieveAccount(ctx, { provider: "password", account: { id } });
+    const id = normalizeEmail(email);
+    const found = await retrieveAccount(ctx, { provider: "password", account: { id } }).catch((error) => {
+      if (error instanceof Error && error.message.includes("InvalidAccountId")) {
+        throw new ConvexError("No password account for that email. They may sign in with Google.");
+      }
+      throw error;
+    });
     await modifyAccountCredentials(ctx, { provider: "password", account: { id, secret: password } });
     await invalidateSessions(ctx, { userId: found.user._id });
     await ctx.runMutation(internal.admin.clearSignInLockout, { email: id });
-    return "Password reset. All existing sessions for that account were ended.";
+    return "Password reset. Their existing sign-ins stopped working immediately.";
   },
 });

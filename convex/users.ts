@@ -41,7 +41,7 @@ export const signInOptions = query({
   args: {},
   handler: async () => ({
     google: Boolean(process.env.FIREBASE_PROJECT_ID),
-    missing: ["JWT_PRIVATE_KEY", "JWKS", "SITE_URL"].filter((name) => !process.env[name]),
+    missing: ["JWT_PRIVATE_KEY", "JWKS"].filter((name) => !process.env[name]),
   }),
 });
 

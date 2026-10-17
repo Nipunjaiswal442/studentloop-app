@@ -128,7 +128,7 @@ export default function Cart() {
               {(!me.hostelBlock || !me.roomNumber) && (
                 <>
                   {" "}
-                  <Link to="/profile" className="text-primary hover:underline">
+                  <Link to="/profile" className="text-primary underline underline-offset-2 hover:no-underline">
                     Save it to your profile
                   </Link>{" "}
                   to skip this next time.

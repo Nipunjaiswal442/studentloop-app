@@ -136,6 +136,16 @@ describe("verifyFirebaseIdToken", () => {
     await rejected(await mint({ subject: "x".repeat(129) }));
   });
 
+  it("rejects a token from a login more than ten minutes old", async () => {
+    await rejected(await mint({ claims: { auth_time: nowSec - 11 * 60 } }));
+  });
+
+  it("accepts a login a few minutes old", async () => {
+    await expect(verify(await mint({ claims: { auth_time: nowSec - 5 * 60 } }))).resolves.toMatchObject({
+      uid: "uid-123",
+    });
+  });
+
   it("rejects a token whose auth_time is in the future", async () => {
     await rejected(await mint({ claims: { auth_time: nowSec + 3600 } }));
   });

@@ -23,9 +23,12 @@ async function seedPasswordUser(t: T, email = "dana@example.com") {
       email,
       firstName: "",
       lastName: "",
-      mobile: "",
-      hostelBlock: "",
-      roomNumber: "",
+      // Everything below was typed in by whoever registered the address first.
+      mobile: "9999999999",
+      hostelBlock: "Squatter Hall",
+      roomNumber: "13",
+      termsAcceptedAt: 1,
+      name: "Pat Squatter",
       walletBalance: 740,
       bonusCoins: 12,
       points: 100,
@@ -70,6 +73,12 @@ describe("new accounts", () => {
     const { userId } = await seedPasswordUser(t);
     const id = await t.run((ctx) => createOrUpdateUserImpl(ctx, { ...google("x@y.com"), existingUserId: userId }));
     expect(id).toBe(userId);
+  });
+
+  it("caps an over-long name", async () => {
+    const t = setup();
+    const id = await t.run((ctx) => createOrUpdateUserImpl(ctx, google("long@example.com", { name: "A".repeat(500) })));
+    expect(((await t.run((ctx) => ctx.db.get(id)))?.name ?? "").length).toBe(80);
   });
 
   it("requires an email", async () => {
@@ -118,7 +127,13 @@ describe("Google adopts an unverified password account", () => {
       otherAccounts: await ctx.db.query("authAccounts").withIndex("userIdAndProvider", (q) => q.eq("userId", other.userId)).collect(),
     }));
 
-    expect(after.user).toMatchObject({ walletBalance: 740, deliveries: 3, firstName: "Dana" });
+    // The wallet and history stay with the account...
+    expect(after.user).toMatchObject({ walletBalance: 740, deliveries: 3, bonusCoins: 12 });
+    // ...but what the pre-registrant typed in does not: Google's verified name wins,
+    // contact details are cleared, and the owner must accept the terms themselves.
+    expect(after.user).toMatchObject({ name: "Dana Roy", firstName: "Dana", lastName: "Roy" });
+    expect(after.user).toMatchObject({ mobile: "", hostelBlock: "", roomNumber: "" });
+    expect(after.user?.termsAcceptedAt).toBeUndefined();
     expect(after.user?.emailVerificationTime).toBeTypeOf("number");
     expect(after.accounts).toHaveLength(0); // password gone; the Google account is added by the library afterwards
     expect(after.session).toBeNull();

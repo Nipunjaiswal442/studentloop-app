@@ -12,6 +12,7 @@
     --card: 0 0% 100%;
     --subtle: 150 38% 96%;
     --border: 152 20% 88%;
+    --control: 160 8% 46%;
     --muted-foreground: 160 8% 36%;
     --primary: 162 93% 24%;
     --primary-hover: 164 88% 19%;
@@ -34,6 +35,7 @@
     --card: 166 26% 9%;
     --subtle: 166 22% 13%;
     --border: 166 16% 21%;
+    --control: 160 8% 44%;
     --muted-foreground: 160 10% 66%;
     --primary: 158 64% 52%;
     --primary-hover: 156 66% 62%;

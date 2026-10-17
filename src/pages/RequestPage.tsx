@@ -628,7 +628,7 @@ function CarrierPanel({ r }: { r: RequestView }) {
 
   return (
     <p className="text-sm text-muted-foreground">
-      This request was cancelled. <Link to="/deliver" className="text-primary hover:underline">See other requests</Link>
+      This request was cancelled. <Link to="/deliver" className="text-primary underline underline-offset-2 hover:no-underline">See other requests</Link>
     </p>
   );
 }
