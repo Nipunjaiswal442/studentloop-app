@@ -1,29 +1,36 @@
 <!doctype html>
 <html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description"
-    content="StudentLoop — Campus Delivery Network at www.STUDENTLOOP.com. Order, deliver, and earn rewards on campus." />
-  <meta name="keywords" content="StudentLoop, campus delivery, student delivery, college delivery, STUDENTLOOP.com" />
-  <meta property="og:title" content="StudentLoop — Campus Delivery Network" />
-  <meta property="og:description"
-    content="Order, deliver, and earn rewards on campus. Join the StudentLoop community at www.STUDENTLOOP.com" />
-  <meta property="og:url" content="https://www.STUDENTLOOP.com" />
-  <meta property="og:type" content="website" />
-  <link rel="canonical" href="https://www.STUDENTLOOP.com" />
-  <title>StudentLoop — www.STUDENTLOOP.com</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
-    rel="stylesheet">
-</head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
-
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#4F46E5" />
+    <meta
+      name="description"
+      content="StudentLoop is a campus delivery network. Order from campus shops, post errands, or earn by delivering for other students."
+    />
+    <meta property="og:title" content="StudentLoop: campus delivery by students, for students" />
+    <meta
+      property="og:description"
+      content="Order from campus shops, post errands, or earn by delivering for other students."
+    />
+    <meta property="og:type" content="website" />
+    <title>StudentLoop: campus delivery by students</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Apply the saved theme before first paint to avoid a flash.
+      try {
+        if (localStorage.getItem('sl_theme') === 'dark') document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

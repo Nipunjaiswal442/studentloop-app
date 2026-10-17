@@ -1,15 +1,6 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
   "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://studentloop-backend.onrender.com/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
+  "buildCommand": "npx convex deploy --cmd 'npm run build'",
+  "outputDirectory": "dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
