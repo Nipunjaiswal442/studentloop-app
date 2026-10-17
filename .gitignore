@@ -1,11 +1,6 @@
 node_modules/
 dist/
-# Environment files — never commit secrets
-.env
-.env*
 .env.local
-server-python/.env
-server-python/__pycache__/
-server-python/studentloop.db
-*.db
+.env.*.local
 .DS_Store
+*.log
