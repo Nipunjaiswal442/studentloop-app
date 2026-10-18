@@ -8,7 +8,7 @@ function LogoMark({ className }: { className?: string }) {
       <path
         d="M9 14a7 7 0 0 1 12-4.5L23 12m0-4v4h-4M23 18a7 7 0 0 1-12 4.5L9 20m0 4v-4h4"
         fill="none"
-        stroke="white"
+        className="stroke-primary-foreground"
         strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"

@@ -26,7 +26,7 @@ export function StarRating({
           <Star
             className={cn(
               "size-7",
-              n <= value ? "fill-primary text-primary" : "text-border",
+              n <= value ? "fill-primary text-primary" : "text-control",
             )}
           />
         </button>

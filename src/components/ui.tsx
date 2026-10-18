@@ -51,7 +51,7 @@ export function LinkButton({
 /* ───────────── Form controls ───────────── */
 
 const control =
-  "w-full rounded-lg border border-border bg-card px-3 text-foreground placeholder:text-muted-foreground/70 transition-colors hover:border-primary/40 focus:border-primary disabled:cursor-not-allowed disabled:bg-subtle disabled:opacity-70";
+  "w-full rounded-lg border border-control bg-card px-3 text-foreground placeholder:text-muted-foreground transition-colors hover:border-primary/60 focus:border-primary disabled:cursor-not-allowed disabled:bg-subtle disabled:opacity-70";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...rest }, ref) {
@@ -118,7 +118,7 @@ export function Choice<T extends string | number>({
               "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors",
               selected
                 ? "border-primary bg-primary-soft text-primary-soft-foreground"
-                : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                : "border-control bg-card text-muted-foreground hover:border-primary/60 hover:text-foreground",
             )}
           >
             {o.label}
@@ -183,6 +183,8 @@ const tones = {
   success: "bg-success-soft text-success",
   warning: "bg-warning-soft text-warning",
   danger: "bg-danger-soft text-danger",
+  /** Filled: tells "finished" apart from the soft emerald of in-progress states. */
+  solid: "bg-primary text-primary-foreground",
 } as const;
 
 export function Badge({
@@ -321,7 +323,7 @@ export function Modal({
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
-      className="m-0 mt-auto max-h-[90dvh] w-full max-w-none overflow-y-auto rounded-t-2xl border border-border bg-card p-0 text-foreground shadow-raised backdrop:bg-foreground/40 sm:m-auto sm:max-w-md sm:rounded-2xl"
+      className="m-0 mt-auto max-h-[90dvh] w-full max-w-none overflow-y-auto rounded-t-2xl border border-border bg-card p-0 text-foreground shadow-raised backdrop:bg-black/50 sm:m-auto sm:max-w-md sm:rounded-2xl"
     >
       {open && (
         <div className="p-5">
