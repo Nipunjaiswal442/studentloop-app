@@ -46,6 +46,9 @@ export default {
       keyframes: {
         rise: { from: { opacity: '0', transform: 'translate3d(0, 1rem, 0)' } },
         enter: { from: { opacity: '0', transform: 'translate3d(0, 0.375rem, 0)' } },
+        // Opacity only: any transform would make the page the containing block of
+        // its position: fixed children (the shop's cart bar) while it plays.
+        fade: { from: { opacity: '0' } },
         'pop-in': { from: { opacity: '0', transform: 'scale(0.6)' } },
         pop: {
           '0%, 100%': { transform: 'scale(1)' },
@@ -60,6 +63,7 @@ export default {
       animation: {
         rise: 'rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards',
         enter: 'enter 0.22s cubic-bezier(0.22, 1, 0.36, 1) backwards',
+        fade: 'fade 0.2s ease-out backwards',
         'pop-in': 'pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards',
         pop: 'pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
         drift: 'drift 26s ease-in-out infinite alternate',

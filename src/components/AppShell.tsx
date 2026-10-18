@@ -57,7 +57,7 @@ export function AppShell() {
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-card p-4 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-card p-4 pt-[calc(1rem+env(safe-area-inset-top))] lg:flex">
         <Logo to="/shops" className="px-2 py-2" />
 
         <nav aria-label="Main" className="mt-6 flex flex-1 flex-col gap-1">
@@ -112,6 +112,13 @@ export function AppShell() {
               {money(me.walletBalance)}
             </NavLink>
             <NavLink
+              to="/help"
+              aria-label="Help"
+              className="grid size-10 place-items-center rounded-full text-muted-foreground hover:bg-subtle"
+            >
+              <LifeBuoy className="size-5" />
+            </NavLink>
+            <NavLink
               to="/cart"
               aria-label={`Cart, ${cart.count} items`}
               className="relative grid size-10 place-items-center rounded-full text-muted-foreground hover:bg-subtle"
@@ -130,7 +137,7 @@ export function AppShell() {
           {/* Keyed by path: each page gets a fresh error boundary and a short enter
               animation. It fills "backwards" so no transform is left behind to
               trap the page's fixed bars once it has played. */}
-          <div key={location.pathname} className="motion-safe:animate-enter">
+          <div key={location.pathname} className="motion-safe:animate-fade">
             <ErrorBoundary>
               <Suspense fallback={<Spinner className="mx-auto mt-24 size-7" />}>
                 <Outlet />

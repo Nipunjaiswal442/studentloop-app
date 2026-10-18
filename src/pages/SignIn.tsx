@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { useConvexAuth } from "convex/react";
 import { Eye, EyeOff, MailCheck, PackageCheck, ShieldCheck, Wallet } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button, Field, Input, Spinner } from "@/components/ui";
 import {
   authErrorMessage,
@@ -138,7 +139,8 @@ export default function SignIn() {
         <p className="text-sm text-muted-foreground">Built for campus life.</p>
       </aside>
 
-      <main className="flex flex-col justify-center px-5 py-10 sm:px-10">
+      <main className="relative flex flex-col justify-center px-5 py-10 sm:px-10">
+        <ThemeToggle className="absolute right-3 top-3 sm:right-6 sm:top-6" />
         <div className="mx-auto w-full max-w-sm">
           <Logo className="mb-10 lg:hidden" />
 

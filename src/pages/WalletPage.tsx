@@ -5,6 +5,7 @@ import { ArrowDownLeft, ArrowUpRight, Coins, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import { Button, Card, Choice, EmptyState, Field, Input, PageHeader, Skeleton } from "@/components/ui";
+import { TOPUP_DAILY_MAX, TOPUP_MAX, TOPUP_MIN } from "@/lib/domain";
 import { dateTime, money } from "@/lib/format";
 import { useSubmit } from "@/lib/submit";
 import { cn } from "@/lib/utils";
@@ -56,13 +57,16 @@ export default function WalletPage() {
                 onChange={(v) => setAmount(String(v))}
                 options={QUICK.map((v) => ({ value: v, label: money(v) }))}
               />
-              <Field label="Amount (₹)" hint="₹10 to ₹5,000 per top-up, ₹10,000 per day.">
+              <Field
+                label="Amount (₹)"
+                hint={`${money(TOPUP_MIN)} to ${money(TOPUP_MAX)} per top-up, ${money(TOPUP_DAILY_MAX)} per day.`}
+              >
                 {(id) => (
-                  <Input id={id} type="number" inputMode="numeric" min={10} max={5000} step={1} required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500" />
+                  <Input id={id} type="number" inputMode="numeric" min={TOPUP_MIN} max={TOPUP_MAX} step={1} required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500" />
                 )}
               </Field>
-              <Button type="submit" className="w-full" loading={pending} disabled={!Number.isInteger(n) || n < 10}>
-                {n >= 10 ? `Add ${money(n)}` : "Add money"}
+              <Button type="submit" className="w-full" loading={pending} disabled={!Number.isInteger(n) || n < TOPUP_MIN}>
+                {n >= TOPUP_MIN ? `Add ${money(n)}` : "Add money"}
               </Button>
               <p className="text-xs text-muted-foreground">
                 Test mode: no real payment is taken yet, so don't expect money to leave your bank account.

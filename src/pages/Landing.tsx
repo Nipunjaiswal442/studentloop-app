@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { buttonClass } from "@/components/button-styles";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Badge, LinkButton } from "@/components/ui";
 import { DELIVERY_FEE, STAGE_LABEL, STEPS, stageTone } from "@/lib/domain";
 import { cn } from "@/lib/utils";
@@ -206,6 +207,7 @@ export default function Landing() {
             <a href="#safety" className="transition-colors hover:text-foreground">Safety</a>
           </nav>
           <div className="flex items-center gap-1 sm:gap-2">
+            <ThemeToggle />
             {isAuthenticated ? (
               <LinkButton to="/shops" size="sm" className="sm:h-10 sm:px-4">
                 Open app

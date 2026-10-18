@@ -57,6 +57,10 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      {/* With the black-translucent status bar of the home-screen app, iOS draws
+          white text over the page; this strip keeps it readable. It has no
+          height anywhere else. */}
+      <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-primary dark:bg-background" />
       <Toaster position="top-center" theme={theme} mobileOffset={{ top: "calc(64px + env(safe-area-inset-top))" }} />
     </CartProvider>
   );

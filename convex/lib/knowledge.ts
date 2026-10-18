@@ -11,6 +11,7 @@ import {
   MAX_REWARD,
   MAX_TIP,
   MAX_UPLOAD_BYTES,
+  MIN_REWARD,
   ORDER_WINDOW_MINUTES,
   OTP_LOCK_MINUTES,
   OTP_MAX_ATTEMPTS,
@@ -218,7 +219,7 @@ Navigation: on phones there is a tab bar at the bottom (Shop, Orders, Deliver, W
 ## Post an errand
 - For anything that isn't on a shop menu (printing, a parcel, something from town). Open Post an errand.
 - Fill in what you need, a category, the items (one per line, optional), where to pick up from, and your hostel and room.
-- Set a reward between ₹10 and ${rupees(MAX_REWARD)}, an optional tip, how soon you need it (Needed within) and how urgent it is (Urgent, Soon or Relaxed).
+- Set a reward between ${rupees(MIN_REWARD)} and ${rupees(MAX_REWARD)}, an optional tip, how soon you need it (Needed within) and how urgent it is (Urgent, Soon or Relaxed).
 - Reward + tip are paid from your wallet and held until the delivery is confirmed. The cost of the items themselves is settled directly with your carrier, not through the app.
 - Refunds: if nobody accepts by your Needed within time, or you cancel before the carrier buys the items, you get the reward and tip back in full.
 - After posting, the errand has its own page (in Orders) that works just like a shop order's page.

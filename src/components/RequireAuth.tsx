@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -12,10 +12,29 @@ import { TERMS } from "../../convex/lib/knowledge";
 import { MeContext } from "@/lib/me";
 import { useSubmit } from "@/lib/submit";
 
+function subscribeOnline(onChange: () => void) {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
+}
+
 function Splash() {
+  // Opened offline (e.g. from the home screen), the session can't be confirmed
+  // until the connection is back, so say so instead of spinning silently.
+  const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine);
   return (
-    <div className="grid min-h-dvh place-items-center pt-safe" role="status">
-      <Spinner className="size-7" />
+    <div className="grid min-h-dvh place-items-center px-6 pt-safe text-center" role="status">
+      <div className="flex flex-col items-center gap-3">
+        <Spinner className="size-7" />
+        {!online && (
+          <p className="max-w-xs text-sm text-muted-foreground">
+            You're offline. StudentLoop will carry on as soon as you're connected again.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
