@@ -51,7 +51,7 @@ export default function Shops() {
       {activeOrder && (
         <Link
           to={`/orders/${activeOrder.id}`}
-          className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary-soft px-4 py-3 text-primary-soft-foreground hover:border-primary/60"
+          className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary-soft px-4 py-3 text-primary-soft-foreground transition-[border-color,transform] duration-200 ease-smooth hover:border-primary/60 active:scale-[0.99]"
         >
           <span className="min-w-0 text-sm">
             <span className="font-semibold">{STAGE_LABEL[activeOrder.status]}</span>
@@ -133,7 +133,7 @@ export default function Shops() {
                 <li key={s.id}>
                   <Link
                     to={`/shops/${s.id}`}
-                    className="flex h-full flex-col rounded-xl border border-border bg-card p-4 shadow-card transition-colors hover:border-primary/50"
+                    className="flex h-full flex-col rounded-xl border border-border bg-card p-4 shadow-card transition-[border-color,box-shadow,transform] duration-200 ease-smooth hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-raised active:scale-[0.99]"
                   >
                     <div className="flex items-start gap-3">
                       <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary-soft-foreground">

@@ -127,11 +127,16 @@ export function AppShell() {
         </header>
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-28 sm:px-6 lg:px-10 lg:py-10 lg:pb-10">
-          <ErrorBoundary key={location.pathname}>
-            <Suspense fallback={<Spinner className="mx-auto mt-24 size-7" />}>
-              <Outlet />
-            </Suspense>
-          </ErrorBoundary>
+          {/* Keyed by path: each page gets a fresh error boundary and a short enter
+              animation. It fills "backwards" so no transform is left behind to
+              trap the page's fixed bars once it has played. */}
+          <div key={location.pathname} className="motion-safe:animate-enter">
+            <ErrorBoundary>
+              <Suspense fallback={<Spinner className="mx-auto mt-24 size-7" />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
         </main>
       </div>
 
@@ -146,20 +151,37 @@ export function AppShell() {
             to={item.to}
             className={({ isActive: on }) =>
               cn(
-                "relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
+                "group relative flex flex-col items-center gap-0.5 pb-2 pt-1.5 text-[11px] font-medium",
                 on ? "text-primary" : "text-muted-foreground",
               )
             }
           >
-            <span className="relative">
-              <item.icon className="size-5" aria-hidden />
-              {item.badge ? (
-                <span className="absolute -right-2 -top-1.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
-                  {item.badge}
+            {({ isActive: on }) => (
+              <>
+                <span className="relative grid h-7 w-14 place-items-center transition-transform duration-150 ease-smooth group-active:scale-90">
+                  {/* Pill behind the active icon; every tab has one so it can grow in and fade out. */}
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "absolute inset-0 rounded-full bg-primary-soft transition-[opacity,transform] duration-300 ease-spring",
+                      on ? "scale-100 opacity-100" : "scale-x-50 opacity-0",
+                    )}
+                  />
+                  <span className="relative">
+                    <item.icon
+                      className={cn("size-5", on && "text-primary-soft-foreground motion-safe:animate-pop")}
+                      aria-hidden
+                    />
+                    {item.badge ? (
+                      <span className="absolute -right-2 -top-1.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </span>
                 </span>
-              ) : null}
-            </span>
-            {item.label}
+                {item.label}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>

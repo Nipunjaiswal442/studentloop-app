@@ -115,7 +115,7 @@ export function Choice<T extends string | number>({
             aria-checked={selected}
             onClick={() => onChange(o.value)}
             className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors",
+              "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 ease-smooth active:scale-[0.96]",
               selected
                 ? "border-primary bg-primary-soft text-primary-soft-foreground"
                 : "border-control bg-card text-muted-foreground hover:border-primary/60 hover:text-foreground",
@@ -128,6 +128,10 @@ export function Choice<T extends string | number>({
     </div>
   );
 }
+
+// The buttons sit flush in one pill, so the icon shrinks on press rather than the button.
+const stepper =
+  "grid size-9 place-items-center transition-colors [&>svg]:transition-transform [&>svg]:duration-150 [&:active>svg]:scale-75";
 
 /** − 2 + control used for quantities. */
 export function Quantity({
@@ -147,7 +151,7 @@ export function Quantity({
         type="button"
         aria-label={`Remove one ${label}`}
         onClick={() => onChange(value - 1)}
-        className="grid size-9 place-items-center rounded-l-lg text-muted-foreground hover:bg-subtle hover:text-foreground"
+        className={cn(stepper, "rounded-l-lg text-muted-foreground hover:bg-subtle hover:text-foreground active:bg-subtle")}
       >
         <Minus className="size-4" />
       </button>
@@ -159,7 +163,7 @@ export function Quantity({
         aria-label={`Add one ${label}`}
         disabled={value >= max}
         onClick={() => onChange(value + 1)}
-        className="grid size-9 place-items-center rounded-r-lg text-primary hover:bg-primary-soft disabled:opacity-40"
+        className={cn(stepper, "rounded-r-lg text-primary hover:bg-primary-soft active:bg-primary-soft disabled:opacity-40")}
       >
         <Plus className="size-4" />
       </button>
@@ -335,7 +339,7 @@ export function Modal({
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="-m-1 rounded-md p-1 text-muted-foreground hover:bg-subtle hover:text-foreground"
+              className="-m-1 rounded-md p-1 text-muted-foreground transition-[color,background-color,transform] duration-150 hover:bg-subtle hover:text-foreground active:scale-90"
             >
               <X className="size-5" />
             </button>
