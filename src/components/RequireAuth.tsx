@@ -8,7 +8,7 @@ import { Prose } from "@/components/Prose";
 import { Button, Spinner } from "@/components/ui";
 import { signOut, takeSignUpName } from "@/lib/auth";
 import { errorMessage } from "@/lib/errors";
-import { TERMS } from "@/lib/legal";
+import { TERMS } from "../../convex/lib/knowledge";
 import { MeContext } from "@/lib/me";
 import { useSubmit } from "@/lib/submit";
 

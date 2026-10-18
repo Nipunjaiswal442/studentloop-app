@@ -1,51 +1,147 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
-import { action, internalMutation } from "./_generated/server";
+import { action, internalMutation, internalQuery, query } from "./_generated/server";
+import {
+  CALLS_PER_DAY,
+  CALLS_PER_MINUTE,
+  LIST_TIMEOUT_MS,
+  MAX_MESSAGE_CHARS,
+  REPLIES,
+  REQUEST_TIMEOUT_MS,
+  baseUrl,
+  buildMessages,
+  classifyStatus,
+  describeError,
+  extractReply,
+  formatAccountSummary,
+  modelOrder,
+  parseModelList,
+  requestBody,
+  type AccountSummary,
+} from "./lib/assistant";
+import { CARRIER_STAGE_LABEL, STAGE_LABEL } from "./lib/knowledge";
 import { requireUser } from "./lib/users";
 
-const MODELS = ["qwen/qwen2.5-72b-instruct", "meta/llama-3.1-8b-instruct"];
-const CALLS_PER_MINUTE = 8;
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
-const SYSTEM_PROMPT = `You are the StudentLoop help assistant. StudentLoop is a peer-to-peer campus delivery app: students order from campus shops or post errands, and other students on campus carry them out for a fee.
+// Per-isolate caches. Convex often reuses a module between calls, which saves
+// a round trip per question; when it doesn't, nothing breaks.
+const modelLists = new Map<string, { ids: string[] | null; until: number }>();
+/** "<base> <model>" → when to try a model that answered 404 again. */
+const missingUntil = new Map<string, number>();
 
-Facts about the app:
-- New accounts get a ₹500 welcome bonus in their wallet.
-- Wallet top-ups are capped; every order and errand is paid from the wallet.
-- A shop order costs the items, a flat ₹30 carrier fee and an optional tip. That money is held until delivery. The carrier gets the fee, the tip and the item cost back.
-- Customers earn bonus coins worth 5% of the item subtotal. Coins are promotional and cannot be cashed out.
-- A request that nobody accepts in time is cancelled and refunded automatically. The requester can also cancel before the carrier has bought the items.
-- Each order has a 4-digit delivery code shown only to the requester. Share it with the carrier only when the items arrive; the carrier enters it to finish the delivery.
-- Carriers upload the purchase bill, then head out. They can hold at most 3 active deliveries.
-- Issues are reported from the order page. Photos can be attached.
-- Forgot your password? Use "Forgot password?" on the sign-in page to get a reset email. Accounts can also use Continue with Google.
-
-Help with questions about the app and basic safety on campus, including spotting scams such as fake requests or people asking for the delivery code early. Keep answers under 3 sentences unless asked for more. If you don't know something, say so.`;
+/** Whether the assistant is switched on. Safe to call signed out. */
+export const status = query({
+  args: {},
+  handler: async () => ({ available: Boolean(process.env.NVIDIA_API_KEY?.trim()) }),
+});
 
 /**
- * Throws when the caller has made too many assistant calls in the last minute.
+ * Throws when the caller has asked too much in the last minute or day.
  * Runs with the identity of the action that calls it.
  */
 export const recordCall = internalMutation({
   args: {},
   handler: async (ctx) => {
     const { _id: userId } = await requireUser(ctx);
-    const hourAgo = Date.now() - 60 * 60 * 1000;
-    const minuteAgo = Date.now() - 60 * 1000;
-    const recent = await ctx.db
+    const now = Date.now();
+    const today = await ctx.db
       .query("aiCalls")
-      .withIndex("by_user", (q) => q.eq("userId", userId).gt("_creationTime", hourAgo))
-      .collect();
-    if (recent.filter((c) => c._creationTime > minuteAgo).length >= CALLS_PER_MINUTE) {
-      throw new ConvexError("You're sending messages too quickly. Wait a moment and try again.");
+      .withIndex("by_user", (q) => q.eq("userId", userId).gt("_creationTime", now - DAY))
+      .take(CALLS_PER_DAY);
+    if (today.filter((c) => c._creationTime > now - MINUTE).length >= CALLS_PER_MINUTE) {
+      throw new ConvexError(REPLIES.tooFast);
     }
+    if (today.length >= CALLS_PER_DAY) throw new ConvexError(REPLIES.dailyLimit);
+
     const stale = await ctx.db
       .query("aiCalls")
-      .withIndex("by_user", (q) => q.eq("userId", userId).lt("_creationTime", hourAgo))
+      .withIndex("by_user", (q) => q.eq("userId", userId).lt("_creationTime", now - DAY))
       .take(50);
     for (const row of stale) await ctx.db.delete(row._id);
     await ctx.db.insert("aiCalls", { userId });
   },
 });
+
+/**
+ * What the assistant may know about the caller: their own balance and their
+ * own active jobs. Nothing about the other people involved (names, rooms,
+ * phones) and never a delivery code.
+ */
+export const accountSummary = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<AccountSummary> => {
+    const user = await requireUser(ctx);
+    const now = Date.now();
+
+    const mine = await ctx.db
+      .query("deliveryRequests")
+      .withIndex("by_requester", (q) => q.eq("requesterId", user._id))
+      .order("desc")
+      .take(50);
+    const requests = mine
+      .filter((job) => job.status !== "delivered" && job.status !== "cancelled")
+      .map((job) => ({
+        kind: job.orderId ? ("order" as const) : ("errand" as const),
+        title: job.title,
+        shop: job.orderId ? job.pickup : null,
+        stage: STAGE_LABEL[job.status],
+        minutesAgo: Math.max(0, Math.floor((now - job._creationTime) / MINUTE)),
+        carrierAssigned: job.partnerId !== undefined,
+        refundInMinutes:
+          job.status === "open"
+            ? Math.max(0, Math.ceil((job._creationTime + job.deadlineMinutes * MINUTE - now) / MINUTE))
+            : null,
+      }));
+
+    const carrying = [];
+    for (const stage of ["out_for_delivery", "purchased", "accepted"] as const) {
+      const jobs = await ctx.db
+        .query("deliveryRequests")
+        .withIndex("by_partner_status", (q) => q.eq("partnerId", user._id).eq("status", stage))
+        .take(10);
+      for (const job of jobs) {
+        carrying.push({
+          kind: job.orderId ? ("order" as const) : ("errand" as const),
+          title: job.title,
+          stage: CARRIER_STAGE_LABEL[job.status],
+        });
+      }
+    }
+
+    return {
+      firstName: user.firstName,
+      walletBalance: user.walletBalance,
+      bonusCoins: user.bonusCoins,
+      requests,
+      carrying,
+    };
+  },
+});
+
+/** Model ids the endpoint offers, or null when it won't say. Cached per isolate. */
+async function listModels(base: string, apiKey: string): Promise<string[] | null> {
+  const now = Date.now();
+  const cached = modelLists.get(base);
+  if (cached && cached.until > now) return cached.ids;
+
+  let ids: string[] | null = null;
+  try {
+    const res = await fetch(`${base}/models`, {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(LIST_TIMEOUT_MS),
+    });
+    if (res.ok) ids = parseModelList(await res.json());
+    else console.warn(`NVIDIA model list answered HTTP ${res.status}`);
+  } catch (e) {
+    console.warn(`NVIDIA model list failed: ${describeError(e)}`);
+  }
+  // A failed listing is retried sooner than a good one is refreshed.
+  modelLists.set(base, { ids, until: now + (ids ? HOUR : 5 * MINUTE) });
+  return ids;
+}
 
 export const ask = action({
   args: {
@@ -57,55 +153,68 @@ export const ask = action({
   handler: async (ctx, args): Promise<{ reply: string }> => {
     if (!(await ctx.auth.getUserIdentity())) throw new ConvexError("Please sign in to continue.");
 
-    const apiKey = process.env.NVIDIA_API_KEY;
-    if (!apiKey) {
-      throw new ConvexError("The assistant isn't set up yet. The FAQ topics above still work.");
-    }
+    const apiKey = process.env.NVIDIA_API_KEY?.trim();
+    if (!apiKey) throw new ConvexError(REPLIES.notConfigured);
     const message = args.message.trim();
-    if (!message || message.length > 500) {
-      throw new ConvexError("Messages must be between 1 and 500 characters.");
-    }
+    if (!message || message.length > MAX_MESSAGE_CHARS) throw new ConvexError(REPLIES.badLength);
+
     await ctx.runMutation(internal.help.recordCall, {});
+    const base = baseUrl(process.env.NVIDIA_BASE_URL);
+    const [account, listed] = await Promise.all([
+      ctx.runQuery(internal.help.accountSummary, {}),
+      listModels(base, apiKey),
+    ]);
+    const summary = formatAccountSummary(account);
+    const now = Date.now();
+    const skip = new Set<string>();
+    for (const [key, until] of missingUntil) {
+      if (until < now) missingUntil.delete(key);
+      else if (key.startsWith(`${base} `)) skip.add(key.slice(base.length + 1));
+    }
+    const models = modelOrder({ configured: process.env.NVIDIA_MODEL, listed, skip });
 
-    const history = args.history.slice(-6).map((m) => ({
-      role: m.role,
-      content: m.text.slice(0, 1000),
-    }));
-
-    for (const model of MODELS) {
+    for (const model of models) {
+      let res: Response;
       try {
-        const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        res = await fetch(`${base}/chat/completions`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${apiKey}`,
             "Content-Type": "application/json",
             Accept: "application/json",
           },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              ...history,
-              { role: "user", content: message },
-            ],
-            max_tokens: 512,
-            temperature: 0.6,
-            top_p: 0.95,
-            stream: false,
-          }),
-          signal: AbortSignal.timeout(25_000),
+          body: JSON.stringify(
+            requestBody(model, buildMessages({ summary, history: args.history, message, model })),
+          ),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
-        if (!res.ok) {
-          console.warn(`NVIDIA model ${model} answered HTTP ${res.status}`);
-          continue;
-        }
-        const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-        const reply = body.choices?.[0]?.message?.content?.trim();
-        if (reply) return { reply };
       } catch (e) {
-        console.warn(`NVIDIA model ${model} failed: ${e instanceof Error ? e.message : String(e)}`);
+        console.warn(`NVIDIA model ${model} failed: ${describeError(e)}`);
+        continue;
       }
+
+      if (!res.ok) {
+        console.warn(`NVIDIA model ${model} answered HTTP ${res.status}`);
+        const outcome = classifyStatus(res.status);
+        if (outcome === "auth") {
+          console.warn("NVIDIA rejected the API key");
+          throw new ConvexError(REPLIES.misconfigured);
+        }
+        if (outcome === "busy") throw new ConvexError(REPLIES.busy);
+        if (res.status === 404) missingUntil.set(`${base} ${model}`, Date.now() + HOUR);
+        continue;
+      }
+
+      let reply = "";
+      try {
+        reply = extractReply(await res.json());
+      } catch (e) {
+        console.warn(`NVIDIA model ${model} sent an unreadable answer: ${describeError(e)}`);
+        continue;
+      }
+      if (reply) return { reply };
+      console.warn(`NVIDIA model ${model} sent an empty answer`);
     }
-    throw new ConvexError("The assistant is unavailable right now. Please try the FAQ topics.");
+    throw new ConvexError(REPLIES.unavailable);
   },
 });

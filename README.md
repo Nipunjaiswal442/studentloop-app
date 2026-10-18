@@ -104,7 +104,7 @@ Keep `npx convex dev` running while you work; it redeploys the backend on every 
 | `VITE_FIREBASE_APP_ID` | Vercel (and `.env.local`) | No | Also from the Firebase web config |
 | `CONVEX_DEPLOY_KEY` | Vercel | Yes | Lets the build deploy the backend. Use a **production** key |
 | `FIREBASE_PROJECT_ID` | Convex | Yes | Which Firebase project's tokens to accept. The Vercel build copies it from `VITE_FIREBASE_PROJECT_ID`; set it yourself only for local work |
-| `NVIDIA_API_KEY` | Convex | No | Turns on the AI assistant. Without it the FAQ still works |
+| `NVIDIA_API_KEY` | Vercel (the build copies it to Convex) or Convex | No | Turns on the help assistant (see [Help assistant](#help-assistant)). Without it the FAQ still works. Never name it `VITE_NVIDIA_API_KEY` |
 
 `VITE_CONVEX_URL` is filled in automatically: by `npx convex dev` locally and by `convex deploy` on Vercel. You don't need to set it.
 
@@ -122,6 +122,16 @@ Keep `npx convex dev` running while you work; it redeploys the backend on every 
 **Preview deployments** need their own Convex *preview* deploy key as `CONVEX_DEPLOY_KEY` in Vercel's Preview environment (never the production key there), plus `FIREBASE_PROJECT_ID` under the Convex project's default environment variables for previews. Without a key, preview builds stop with a message saying so; production is unaffected.
 
 **Leftovers from the previous sign-in system**, safe to delete in the Convex dashboard once you're happy: the environment variables `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and the tables `authAccounts`, `authSessions`, `authRefreshTokens`, `authVerificationCodes`, `authVerifiers`, `authRateLimits` (they hold old password hashes and nothing reads them).
+
+### Help assistant
+
+The chat on the Help page runs on [NVIDIA NIM](https://build.nvidia.com). To switch it on, create an API key at build.nvidia.com and add it in Vercel as `NVIDIA_API_KEY` (Production), then redeploy: the build copies it to Convex. Setting it directly on the Convex deployment works too. That's all; until then the Help page shows only the FAQ.
+
+- The assistant asks NVIDIA which models the key can use and picks the first available of Qwen 3.5 122B, Llama 3.3 70B, Qwen 2.5 72B, Llama 3.1 70B and 8B, falling back to the next if one fails. Set `NVIDIA_MODEL` to choose one yourself, or `NVIDIA_BASE_URL` for another OpenAI-compatible endpoint.
+- Never use the name `VITE_NVIDIA_API_KEY`: anything starting with `VITE_` is published inside the site, so the build stops if it sees one.
+- Each person can ask 8 questions a minute and 60 a day. Along with the question, NVIDIA gets a short summary of the asker's own account (first name, balance, active orders and deliveries), never other people's details or delivery codes.
+- If it replies that it's misconfigured, NVIDIA rejected the key; check `NVIDIA_API_KEY`. Failures are logged (without the key or messages) under *Logs* in the Convex dashboard.
+- What it knows about the app lives in `convex/lib/knowledge.ts`, next to the FAQ and terms. Update the guide there when screens or rules change.
 
 ### If sign-in doesn't work
 

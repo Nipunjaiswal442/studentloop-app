@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { Prose } from "@/components/Prose";
-import { TERMS } from "@/lib/legal";
+import { TERMS } from "../../convex/lib/knowledge";
 
 export default function Terms() {
   return (
