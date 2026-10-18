@@ -2,7 +2,15 @@ import { Coffee, Pencil, Pill, ShoppingBasket, type LucideIcon } from "lucide-re
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../convex/_generated/api";
 
-export { CATEGORIES, ISSUE_TYPES, URGENCIES, DELIVERY_FEE } from "../../convex/lib/constants";
+export {
+  BONUS_COIN_RATE,
+  CATEGORIES,
+  DELIVERY_FEE,
+  ISSUE_TYPES,
+  MAX_ACTIVE_JOBS,
+  MAX_REWARD,
+  URGENCIES,
+} from "../../convex/lib/constants";
 export type { Category, Urgency } from "../../convex/lib/constants";
 
 export type RequestView = NonNullable<FunctionReturnType<typeof api.deliveries.get>>;

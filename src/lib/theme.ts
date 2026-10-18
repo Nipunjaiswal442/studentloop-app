@@ -1,39 +1,50 @@
 import { useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark";
-const KEY = "sl_theme";
+// Only written when the user picks a theme; until then the device setting wins.
+// (index.html reads the same key before first paint.)
+const KEY = "sl_theme_choice";
+const system = typeof window !== "undefined" ? window.matchMedia?.("(prefers-color-scheme: dark)") : undefined;
 
-function read(): Theme {
+function storedChoice(): Theme | null {
   try {
-    return localStorage.getItem(KEY) === "dark" ? "dark" : "light";
+    const value = localStorage.getItem(KEY);
+    return value === "dark" || value === "light" ? value : null;
   } catch {
-    return "light";
+    return null;
   }
 }
 
 // One store for the whole app so every consumer (shell, toaster) agrees.
-let current: Theme = read();
+let choice = storedChoice();
+let current: Theme = "light";
 const listeners = new Set<() => void>();
 
-function apply(next: Theme) {
-  current = next;
-  document.documentElement.classList.toggle("dark", next === "dark");
-  try {
-    localStorage.setItem(KEY, next);
-  } catch {
-    // Private mode: the choice just won't persist.
-  }
+function render() {
+  current = choice ?? (system?.matches ? "dark" : "light");
+  document.documentElement.classList.toggle("dark", current === "dark");
   listeners.forEach((l) => l());
 }
 
-apply(current);
+system?.addEventListener?.("change", render);
+render();
 
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);
 };
 
+function toggle() {
+  choice = current === "dark" ? "light" : "dark";
+  try {
+    localStorage.setItem(KEY, choice);
+  } catch {
+    // Private mode: the choice just won't persist.
+  }
+  render();
+}
+
 export function useTheme() {
   const theme = useSyncExternalStore(subscribe, () => current);
-  return { theme, toggle: () => apply(current === "dark" ? "light" : "dark") };
+  return { theme, toggle };
 }

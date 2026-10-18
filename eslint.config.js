@@ -18,7 +18,7 @@ export default defineConfig([
     languageOptions: { ecmaVersion: 2022, globals: globals.browser },
   },
   {
-    files: ['convex/**/*.ts', 'tests/**/*.ts', '*.{ts,js}'],
+    files: ['convex/**/*.ts', 'tests/**/*.ts', 'scripts/**/*.mjs', '*.{ts,js}'],
     extends: [js.configs.recommended, tseslint.configs.recommended],
     languageOptions: { ecmaVersion: 2022, globals: { ...globals.node, ...globals.browser } },
   },

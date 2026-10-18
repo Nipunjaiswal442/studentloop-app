@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import { Button, Card, Choice, EmptyState, Field, Input, LinkButton, PageHeader, Quantity, Row } from "@/components/ui";
 import { useCart } from "@/lib/cart";
-import { DELIVERY_FEE, TIP_OPTIONS } from "@/lib/domain";
+import { BONUS_COIN_RATE, DELIVERY_FEE, TIP_OPTIONS } from "@/lib/domain";
 import { money } from "@/lib/format";
 import { useMe } from "@/lib/me";
 import { useSubmit } from "@/lib/submit";
@@ -52,10 +52,29 @@ export default function Cart() {
     );
   }
 
+  if (shop === null) {
+    return (
+      <div>
+        <PageHeader title="Your cart" />
+        <EmptyState
+          icon={AlertCircle}
+          title={`${cart.shopName || "This shop"} is no longer listed`}
+          action={
+            <Button size="sm" onClick={cart.clear}>
+              Clear cart
+            </Button>
+          }
+        >
+          Its items can't be ordered any more.
+        </EmptyState>
+      </div>
+    );
+  }
+
   const total = cart.subtotal + DELIVERY_FEE + tip;
   const short = Math.max(0, total - me.walletBalance);
   const hasAddress = hostel.trim() !== "" && room.trim() !== "";
-  const coins = Math.floor(cart.subtotal * 0.05);
+  const coins = Math.floor(cart.subtotal * BONUS_COIN_RATE);
 
   async function placeOrder() {
     if (!cart.shopId) return;

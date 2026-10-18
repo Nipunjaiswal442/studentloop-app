@@ -23,9 +23,12 @@
       rel="stylesheet"
     />
     <script>
-      // Apply the saved theme before first paint to avoid a flash.
+      // Apply the theme before first paint to avoid a flash (same rule as src/lib/theme.ts).
       try {
-        if (localStorage.getItem('sl_theme') === 'dark') document.documentElement.classList.add('dark');
+        var choice = localStorage.getItem('sl_theme_choice');
+        if (choice === 'dark' || (choice !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
       } catch (e) {}
     </script>
   </head>

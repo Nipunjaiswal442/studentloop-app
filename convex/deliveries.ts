@@ -195,7 +195,7 @@ async function cancelAndRefund(ctx: MutationCtx, job: Job, reason: string) {
   }
   await logActivity(ctx, job.requesterId, "request_cancelled", `Cancelled: ${job.title}`);
   if (job.partnerId) {
-    await logActivity(ctx, job.partnerId, "delivery_cancelled", `Requester cancelled: ${job.title}`);
+    await logActivity(ctx, job.partnerId, "delivery_cancelled", `${reason}: ${job.title}`);
   }
 }
 
@@ -325,12 +325,15 @@ export const accept = mutation({
     if (job.status !== "open") fail("Someone else has already taken this request.");
     if (Date.now() > expiresAt(job)) fail("This request has expired.");
 
-    const mine = await ctx.db
-      .query("deliveryRequests")
-      .withIndex("by_partner", (q) => q.eq("partnerId", user._id))
-      .order("desc")
-      .take(50);
-    if (mine.filter((j) => (ACTIVE as readonly string[]).includes(j.status)).length >= MAX_ACTIVE_JOBS) {
+    let active = 0;
+    for (const status of ACTIVE) {
+      const jobs = await ctx.db
+        .query("deliveryRequests")
+        .withIndex("by_partner_status", (q) => q.eq("partnerId", user._id).eq("status", status))
+        .take(MAX_ACTIVE_JOBS);
+      active += jobs.length;
+    }
+    if (active >= MAX_ACTIVE_JOBS) {
       fail(`Finish one of your ${MAX_ACTIVE_JOBS} active deliveries before taking another.`);
     }
 
@@ -347,7 +350,14 @@ export const release = mutation({
     const job = await loadJob(ctx, id);
     if (job.partnerId !== user._id) fail("This isn't your delivery.");
     if (job.status !== "accepted") fail("You can only drop a delivery before buying the items.");
+    if (Date.now() > expiresAt(job)) {
+      // The scheduled expiry has already passed, so reopening would leave the
+      // payment held with nobody able to accept it. Refund instead.
+      await cancelAndRefund(ctx, job, "The carrier dropped it after the deadline");
+      return;
+    }
     await ctx.db.patch(job._id, { status: "open", partnerId: undefined });
+    await logActivity(ctx, job.requesterId, "request_reopened", `Your carrier dropped: ${job.title}`);
   },
 });
 

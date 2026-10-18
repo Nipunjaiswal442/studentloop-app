@@ -23,9 +23,28 @@ function setup() {
 }
 type T = ReturnType<typeof setup>;
 
+const ISSUER = "https://securetoken.google.com/studentloop-test";
+
+/**
+ * The identity Convex builds from a Firebase ID token. Claims keep their JWT
+ * names (`email_verified`), as the real backend does for customJwt providers.
+ */
+function identity(uid: string, extra: { email?: string; emailVerified?: boolean; name?: string } = {}) {
+  const { emailVerified, ...rest } = extra;
+  return {
+    issuer: ISSUER,
+    subject: uid,
+    tokenIdentifier: `${ISSUER}|${uid}`,
+    ...rest,
+    ...(emailVerified === undefined ? {} : { email_verified: emailVerified }),
+  };
+}
+
 async function makeUser(t: T, name: string, balance = 500) {
+  const who = identity(`uid-${name.toLowerCase()}`);
   const id = await t.run((ctx) =>
     ctx.db.insert("users", {
+      tokenIdentifier: who.tokenIdentifier,
       email: `${name.toLowerCase()}@college.edu`,
       firstName: name,
       lastName: "Test",
@@ -41,7 +60,7 @@ async function makeUser(t: T, name: string, balance = 500) {
       ratingCount: 0,
     }),
   );
-  return { id, as: t.withIdentity({ subject: `${id}|session` }) };
+  return { id, as: t.withIdentity(who) };
 }
 
 async function makeShop(t: T) {
@@ -464,5 +483,143 @@ describe("disputes", () => {
     expect((await alice.as.query(api.deliveries.get, { id }))?.dispute?.issueType).toBe(
       "Delayed delivery",
     );
+  });
+});
+
+describe("accounts", () => {
+  it("creates the account once, with the welcome bonus, on first sign-in", async () => {
+    const t = setup();
+    const ananya = t.withIdentity(identity("uid-ananya", { email: "Ananya@College.edu" }));
+    expect(await ananya.query(api.users.me, {})).toBeNull();
+
+    const id = await ananya.mutation(api.users.ensure, { name: "Ananya Sharma Rao" });
+    expect(await ananya.mutation(api.users.ensure, {})).toBe(id);
+
+    const me = await ananya.query(api.users.me, {});
+    expect(me).toMatchObject({
+      email: "ananya@college.edu",
+      firstName: "Ananya",
+      lastName: "Sharma Rao",
+      walletBalance: 500,
+      termsAccepted: false,
+    });
+    const summary = await ananya.query(api.wallet.summary, {});
+    expect(summary.transactions).toEqual([expect.objectContaining({ kind: "welcome", amount: 500 })]);
+    expect(await t.run((ctx) => ctx.db.query("users").collect())).toHaveLength(1);
+  });
+
+  it("prefers the name on the Firebase account and fills a missing one later", async () => {
+    const t = setup();
+    const google = t.withIdentity(identity("uid-g", { email: "g@college.edu", name: "Rohan Mehta" }));
+    await google.mutation(api.users.ensure, { name: "ignored" });
+    expect(await google.query(api.users.me, {})).toMatchObject({ firstName: "Rohan", lastName: "Mehta" });
+
+    const quiet = t.withIdentity(identity("uid-q", { email: "q@college.edu" }));
+    await quiet.mutation(api.users.ensure, {});
+    expect((await quiet.query(api.users.me, {}))?.firstName).toBe("");
+    const named = t.withIdentity(identity("uid-q", { email: "q@college.edu", name: "Priya Nair" }));
+    await named.mutation(api.users.ensure, {});
+    expect((await named.query(api.users.me, {}))?.firstName).toBe("Priya");
+  });
+
+  it("hands a legacy account to its owner only once Firebase has verified the email", async () => {
+    const t = setup();
+    const legacyId = await t.run((ctx) =>
+      ctx.db.insert("users", {
+        email: "old@college.edu",
+        firstName: "Old",
+        lastName: "Account",
+        mobile: "98765 43210",
+        hostelBlock: "Hostel 1",
+        roomNumber: "101",
+        termsAcceptedAt: 1,
+        walletBalance: 777,
+        bonusCoins: 0,
+        points: 0,
+        deliveries: 0,
+        trustScore: 80,
+        rating: 0,
+        ratingCount: 0,
+      }),
+    );
+
+    // Someone who merely typed the address gets a fresh account instead.
+    const squatter = t.withIdentity(identity("uid-squat", { email: "old@college.edu", emailVerified: false }));
+    expect(await squatter.mutation(api.users.ensure, {})).not.toBe(legacyId);
+    expect((await squatter.query(api.users.me, {}))?.walletBalance).toBe(500);
+
+    const owner = t.withIdentity(identity("uid-owner", { email: "old@college.edu", emailVerified: true }));
+    expect(await owner.mutation(api.users.ensure, { name: "Real Owner" })).toBe(legacyId);
+    // Keeps the money, drops what whoever registered it could have typed.
+    expect(await owner.query(api.users.me, {})).toMatchObject({
+      walletBalance: 777,
+      firstName: "Real",
+      mobile: "",
+      roomNumber: "",
+      termsAccepted: false,
+    });
+
+    // It can't be claimed twice.
+    const another = t.withIdentity(identity("uid-other", { email: "old@college.edu", emailVerified: true }));
+    expect(await another.mutation(api.users.ensure, {})).not.toBe(legacyId);
+  });
+
+  it("refuses to set up an account without a signed-in identity", async () => {
+    const t = setup();
+    await expect(t.mutation(api.users.ensure, {})).rejects.toThrow(/sign in/);
+  });
+
+  it("asks a signed-in user without an account row to reload", async () => {
+    const t = setup();
+    const fresh = t.withIdentity(identity("uid-new", { email: "new@college.edu" }));
+    await expect(fresh.query(api.wallet.summary, {})).rejects.toThrow(/being set up/);
+  });
+});
+
+describe("dropping a delivery", () => {
+  it("reopens it before the deadline", async () => {
+    const t = setup();
+    const alice = await makeUser(t, "Alice", 1000);
+    const bob = await makeUser(t, "Bob", 0);
+    const shop = await makeShop(t);
+    const id = await placeOrder(alice, shop);
+    await bob.as.mutation(api.deliveries.accept, { id });
+    await bob.as.mutation(api.deliveries.release, { id });
+    expect((await alice.as.query(api.deliveries.get, { id }))?.status).toBe("open");
+  });
+
+  it("refunds instead of reopening once the deadline has passed", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = setup();
+      const alice = await makeUser(t, "Alice", 1000);
+      const bob = await makeUser(t, "Bob", 0);
+      const shop = await makeShop(t);
+      const id = await placeOrder(alice, shop);
+      await bob.as.mutation(api.deliveries.accept, { id });
+
+      // The scheduled expiry runs at the deadline and leaves the taken job alone.
+      vi.advanceTimersByTime(61 * 60 * 1000);
+      await t.finishInProgressScheduledFunctions();
+      expect((await alice.as.query(api.deliveries.get, { id }))?.status).toBe("accepted");
+
+      await bob.as.mutation(api.deliveries.release, { id });
+
+      const job = await alice.as.query(api.deliveries.get, { id });
+      expect(job?.status).toBe("cancelled");
+      expect((await alice.as.query(api.users.me, {}))?.walletBalance).toBe(1000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("help assistant", () => {
+  it("rate-limits per signed-in user", async () => {
+    const t = setup();
+    const alice = await makeUser(t, "Alice");
+    for (let i = 0; i < 8; i++) await alice.as.mutation(internal.help.recordCall, {});
+    await expect(alice.as.mutation(internal.help.recordCall, {})).rejects.toThrow(/too quickly/);
+    await expect(t.mutation(internal.help.recordCall, {})).rejects.toThrow(/sign in/);
   });
 });
