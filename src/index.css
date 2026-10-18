@@ -3,43 +3,47 @@
 @tailwind utilities;
 
 @layer base {
-  /* Indigo on white. All colours are HSL channels so Tailwind can add alpha. */
+  /* Emerald on white. All colours are HSL channels so Tailwind can add alpha.
+     Dark mode swaps to a brighter emerald on deep green so text and fills keep
+     their contrast. tests/theme.test.ts checks every pair below against WCAG AA. */
   :root {
     --background: 0 0% 100%;
-    --foreground: 228 40% 11%;
+    --foreground: 160 30% 9%;
     --card: 0 0% 100%;
-    --subtle: 226 100% 97%;
-    --border: 228 50% 91%;
-    --muted-foreground: 228 14% 42%;
-    --primary: 243 75% 59%;
-    --primary-hover: 244 55% 51%;
+    --subtle: 150 38% 96%;
+    --border: 152 20% 88%;
+    --control: 160 8% 46%;
+    --muted-foreground: 160 8% 36%;
+    --primary: 162 93% 24%;
+    --primary-hover: 164 88% 19%;
     --primary-foreground: 0 0% 100%;
-    --primary-soft: 226 100% 96%;
-    --primary-soft-foreground: 244 55% 46%;
-    --success: 161 94% 25%;
-    --success-soft: 152 76% 95%;
+    --primary-soft: 152 55% 92%;
+    --primary-soft-foreground: 164 88% 17%;
+    --success: 162 93% 24%;
+    --success-soft: 152 60% 94%;
     --warning: 28 90% 33%;
     --warning-soft: 48 100% 95%;
     --danger: 0 70% 45%;
     --danger-soft: 0 86% 97%;
-    --shadow: 232 60% 20%;
+    --shadow: 165 40% 12%;
     color-scheme: light;
   }
 
   .dark {
-    --background: 235 38% 8%;
-    --foreground: 226 50% 96%;
-    --card: 235 32% 11%;
-    --subtle: 235 30% 14%;
-    --border: 235 24% 21%;
-    --muted-foreground: 228 14% 68%;
-    --primary: 239 84% 67%;
-    --primary-hover: 238 83% 72%;
-    --primary-foreground: 0 0% 100%;
-    --primary-soft: 240 38% 19%;
-    --primary-soft-foreground: 232 100% 85%;
-    --success: 152 60% 62%;
-    --success-soft: 160 40% 14%;
+    --background: 166 30% 6%;
+    --foreground: 150 25% 95%;
+    --card: 166 26% 9%;
+    --subtle: 166 22% 13%;
+    --border: 166 16% 21%;
+    --control: 160 8% 44%;
+    --muted-foreground: 160 10% 66%;
+    --primary: 158 64% 52%;
+    --primary-hover: 156 66% 62%;
+    --primary-foreground: 166 80% 8%;
+    --primary-soft: 164 38% 16%;
+    --primary-soft-foreground: 156 62% 78%;
+    --success: 158 64% 52%;
+    --success-soft: 164 35% 14%;
     --warning: 40 90% 65%;
     --warning-soft: 35 40% 14%;
     --danger: 0 90% 72%;
@@ -89,6 +93,14 @@
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+  /* Room for the iPhone status bar and home indicator when the app runs
+     full-screen from the home screen (index.html uses viewport-fit=cover). */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
