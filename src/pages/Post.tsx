@@ -9,6 +9,7 @@ import {
   CATEGORIES,
   CATEGORY_ICON,
   DEADLINE_OPTIONS,
+  MAX_REWARD,
   TIP_OPTIONS,
   URGENCY_LABEL,
   URGENCIES,
@@ -37,7 +38,7 @@ export default function Post() {
   const [urgency, setUrgency] = useState<Urgency>("medium");
 
   const rewardN = Number(reward);
-  const rewardOk = Number.isInteger(rewardN) && rewardN >= 10 && rewardN <= 500;
+  const rewardOk = Number.isInteger(rewardN) && rewardN >= 10 && rewardN <= MAX_REWARD;
   const total = (rewardOk ? rewardN : 0) + tip;
   const short = Math.max(0, total - me.walletBalance);
 
@@ -121,10 +122,10 @@ export default function Post() {
 
           <Card className="space-y-5">
             <h2 className="font-semibold">Reward and timing</h2>
-            <Field label="Reward (₹)" hint="Between ₹10 and ₹500. Item cost is settled directly with your carrier.">
+            <Field label="Reward (₹)" hint={`Between ₹10 and ${money(MAX_REWARD)}. Item cost is settled directly with your carrier.`}>
               {(id) => (
                 <div className="space-y-2">
-                  <Input id={id} type="number" inputMode="numeric" min={10} max={500} step={1} required value={reward} onChange={(e) => setReward(e.target.value)} className="sm:max-w-40" />
+                  <Input id={id} type="number" inputMode="numeric" min={10} max={MAX_REWARD} step={1} required value={reward} onChange={(e) => setReward(e.target.value)} className="sm:max-w-40" />
                   <Choice
                     label="Quick reward"
                     value={rewardN}

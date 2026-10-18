@@ -1,7 +1,7 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalMutation } from "./_generated/server";
+import { requireUser } from "./lib/users";
 
 const MODELS = ["qwen/qwen2.5-72b-instruct", "meta/llama-3.1-8b-instruct"];
 const CALLS_PER_MINUTE = 8;
@@ -17,14 +17,18 @@ Facts about the app:
 - Each order has a 4-digit delivery code shown only to the requester. Share it with the carrier only when the items arrive; the carrier enters it to finish the delivery.
 - Carriers upload the purchase bill, then head out. They can hold at most 3 active deliveries.
 - Issues are reported from the order page. Photos can be attached.
-- Password resets are not self-service yet; users should contact support@studentloop.com.
+- Forgot your password? Use "Forgot password?" on the sign-in page to get a reset email. Accounts can also use Continue with Google.
 
 Help with questions about the app and basic safety on campus, including spotting scams such as fake requests or people asking for the delivery code early. Keep answers under 3 sentences unless asked for more. If you don't know something, say so.`;
 
-/** Throws when the user has made too many assistant calls in the last minute. */
+/**
+ * Throws when the caller has made too many assistant calls in the last minute.
+ * Runs with the identity of the action that calls it.
+ */
 export const recordCall = internalMutation({
-  args: { userId: v.id("users") },
-  handler: async (ctx, { userId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const { _id: userId } = await requireUser(ctx);
     const hourAgo = Date.now() - 60 * 60 * 1000;
     const minuteAgo = Date.now() - 60 * 1000;
     const recent = await ctx.db
@@ -51,8 +55,7 @@ export const ask = action({
     ),
   },
   handler: async (ctx, args): Promise<{ reply: string }> => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new ConvexError("Please sign in to continue.");
+    if (!(await ctx.auth.getUserIdentity())) throw new ConvexError("Please sign in to continue.");
 
     const apiKey = process.env.NVIDIA_API_KEY;
     if (!apiKey) {
@@ -62,7 +65,7 @@ export const ask = action({
     if (!message || message.length > 500) {
       throw new ConvexError("Messages must be between 1 and 500 characters.");
     }
-    await ctx.runMutation(internal.help.recordCall, { userId });
+    await ctx.runMutation(internal.help.recordCall, {});
 
     const history = args.history.slice(-6).map((m) => ({
       role: m.role,
@@ -92,12 +95,15 @@ export const ask = action({
           }),
           signal: AbortSignal.timeout(25_000),
         });
-        if (!res.ok) continue;
+        if (!res.ok) {
+          console.warn(`NVIDIA model ${model} answered HTTP ${res.status}`);
+          continue;
+        }
         const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
         const reply = body.choices?.[0]?.message?.content?.trim();
         if (reply) return { reply };
-      } catch {
-        // Try the next model.
+      } catch (e) {
+        console.warn(`NVIDIA model ${model} failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
     throw new ConvexError("The assistant is unavailable right now. Please try the FAQ topics.");

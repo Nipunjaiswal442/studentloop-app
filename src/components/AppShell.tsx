@@ -1,7 +1,6 @@
 import { Suspense } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "convex/react";
-import { useAuthActions } from "@convex-dev/auth/react";
 import {
   Bike,
   LifeBuoy,
@@ -20,6 +19,7 @@ import { api } from "../../convex/_generated/api";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Logo } from "@/components/Logo";
 import { Spinner } from "@/components/ui";
+import { useSignOut } from "@/lib/auth";
 import { useCart } from "@/lib/cart";
 import { isActive } from "@/lib/domain";
 import { initials, money } from "@/lib/format";
@@ -33,8 +33,7 @@ export function AppShell() {
   const me = useMe();
   const cart = useCart();
   const { theme, toggle } = useTheme();
-  const { signOut } = useAuthActions();
-  const navigate = useNavigate();
+  const signOut = useSignOut();
   const location = useLocation();
 
   // Live counts: these update the moment an order or delivery changes state.
@@ -54,11 +53,6 @@ export function AppShell() {
     { to: "/post", label: "Post an errand", icon: PackagePlus },
     { to: "/help", label: "Help", icon: LifeBuoy },
   ];
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/", { replace: true });
-  };
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
@@ -96,7 +90,7 @@ export function AppShell() {
               {theme === "dark" ? "Light" : "Dark"}
             </button>
             <button
-              onClick={() => void handleSignOut()}
+              onClick={() => void signOut()}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
             >
               <LogOut className="size-3.5" />

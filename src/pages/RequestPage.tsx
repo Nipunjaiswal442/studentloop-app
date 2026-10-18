@@ -39,6 +39,7 @@ import { useCart, type CartLine } from "@/lib/cart";
 import {
   CATEGORY_ICON,
   ISSUE_TYPES,
+  MAX_ACTIVE_JOBS,
   STAGE_LABEL,
   URGENCY_LABEL,
   isActive,
@@ -511,7 +512,7 @@ function CarrierPanel({ r }: { r: RequestView }) {
         >
           Accept delivery
         </Button>
-        <p className="mt-3 text-xs text-muted-foreground">You can hold up to 3 active deliveries at once.</p>
+        <p className="mt-3 text-xs text-muted-foreground">You can hold up to {MAX_ACTIVE_JOBS} active deliveries at once.</p>
       </Card>
     );
   }

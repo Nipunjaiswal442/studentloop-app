@@ -1,12 +1,19 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { ChevronRight, FileText, LifeBuoy, LogOut, Moon, ReceiptText, Sun } from "lucide-react";
+import { BadgeCheck, ChevronRight, FileText, LifeBuoy, LogOut, MailWarning, Moon, ReceiptText, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import { Avatar } from "@/components/AppShell";
 import { Button, Card, Field, Input, PageHeader } from "@/components/ui";
+import {
+  authErrorMessage,
+  refreshAuthUser,
+  resendVerificationEmail,
+  sendPasswordReset,
+  useAuthUser,
+  useSignOut,
+} from "@/lib/auth";
 import { dateTime } from "@/lib/format";
 import { useMe } from "@/lib/me";
 import { useSubmit } from "@/lib/submit";
@@ -16,9 +23,8 @@ export default function Profile() {
   const me = useMe();
   const update = useMutation(api.users.updateProfile);
   const activity = useQuery(api.users.recentActivity);
-  const { signOut } = useAuthActions();
   const { theme, toggle } = useTheme();
-  const navigate = useNavigate();
+  const signOut = useSignOut();
   const { pending, run } = useSubmit();
 
   const [form, setForm] = useState({
@@ -130,6 +136,8 @@ export default function Profile() {
             </ul>
           </Card>
 
+          <AccountCard />
+
           <Card>
             <h2 className="font-semibold">Appearance</h2>
             <Button variant="secondary" className="mt-3 w-full" onClick={toggle}>
@@ -141,9 +149,7 @@ export default function Profile() {
           <Button
             variant="danger"
             className="w-full"
-            onClick={() =>
-              void signOut().then(() => navigate("/", { replace: true }))
-            }
+            onClick={() => void signOut()}
           >
             <LogOut className="size-4" aria-hidden />
             Sign out
@@ -151,5 +157,86 @@ export default function Profile() {
         </aside>
       </div>
     </div>
+  );
+}
+
+/** Email verification and password reset, handled by Firebase. */
+function AccountCard() {
+  const user = useAuthUser();
+  const [busy, setBusy] = useState(false);
+  if (!user) return null;
+
+  /** Runs a Firebase action and toasts the message it returns. */
+  async function act(action: () => Promise<string>) {
+    setBusy(true);
+    try {
+      toast(await action());
+    } catch (e) {
+      const message = authErrorMessage(e);
+      if (message) toast.error(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="font-semibold">Account</h2>
+      <p className="mt-3 truncate text-sm">{user.email}</p>
+      {user.emailVerified ? (
+        <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-success">
+          <BadgeCheck className="size-4" aria-hidden /> Email verified
+        </p>
+      ) : (
+        <div className="mt-2 rounded-lg bg-warning-soft p-3 text-sm text-warning">
+          <p className="flex gap-2">
+            <MailWarning className="mt-0.5 size-4 shrink-0" aria-hidden />
+            Not verified yet. Open the link we emailed you (check spam), then tap "I've verified".
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  await resendVerificationEmail();
+                  return `Verification email sent to ${user.email}.`;
+                })
+              }
+            >
+              Resend email
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() =>
+                void act(async () =>
+                  (await refreshAuthUser()) ? "Email verified. Thanks!" : "Not verified yet. Open the link in the email first.",
+                )
+              }
+            >
+              I've verified
+            </Button>
+          </div>
+        </div>
+      )}
+      {user.hasPassword && (
+        <Button
+          variant="secondary"
+          className="mt-4 w-full"
+          disabled={busy}
+          onClick={() =>
+            void act(async () => {
+              await sendPasswordReset(user.email);
+              return `Password reset link sent to ${user.email}.`;
+            })
+          }
+        >
+          Change password
+        </Button>
+      )}
+    </Card>
   );
 }

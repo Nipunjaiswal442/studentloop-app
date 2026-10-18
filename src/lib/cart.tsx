@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
+import { MAX_LINE_QTY } from "../../convex/lib/constants";
+import { useAuthUser } from "./auth";
 
 export type CartLine = {
   menuItemId: Id<"menuItems">;
@@ -42,6 +44,10 @@ const CartContext = createContext<CartApi | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<CartState>(load);
+  const signedOut = useAuthUser() === null;
+
+  // A cart belongs to whoever is signed in: don't hand it to the next person on this device.
+  if (signedOut && state.lines.length > 0) setState(EMPTY);
 
   useEffect(() => {
     try {
@@ -51,21 +57,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [state]);
 
-  const add = useCallback<CartApi["add"]>((shop, item) => {
-    let ok = true;
-    setState((s) => {
-      if (s.shopId && s.shopId !== shop.id && s.lines.length > 0) {
-        ok = false;
-        return s;
-      }
-      const existing = s.lines.find((l) => l.menuItemId === item.id);
-      const lines = existing
-        ? s.lines.map((l) => (l.menuItemId === item.id ? { ...l, qty: l.qty + 1 } : l))
-        : [...s.lines, { menuItemId: item.id, name: item.name, price: item.price, qty: 1, note: "" }];
-      return { shopId: shop.id, shopName: shop.name, lines };
-    });
-    return ok;
-  }, []);
+  // Decided from the rendered state, not inside the updater: React may run an
+  // updater after this returns, so it can't decide the return value.
+  const otherShop = state.lines.length > 0 ? state.shopId : null;
+  const add = useCallback<CartApi["add"]>(
+    (shop, item) => {
+      if (otherShop !== null && otherShop !== shop.id) return false;
+      setState((s) => {
+        const existing = s.lines.find((l) => l.menuItemId === item.id);
+        const lines = existing
+          ? s.lines.map((l) =>
+              l.menuItemId === item.id ? { ...l, qty: Math.min(l.qty + 1, MAX_LINE_QTY) } : l,
+            )
+          : [...s.lines, { menuItemId: item.id, name: item.name, price: item.price, qty: 1, note: "" }];
+        return { shopId: shop.id, shopName: shop.name, lines };
+      });
+      return true;
+    },
+    [otherShop],
+  );
 
   const startNew = useCallback<CartApi["startNew"]>((shop, lines) => {
     setState({ shopId: shop.id, shopName: shop.name, lines });
@@ -94,7 +104,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const setQty = useCallback<CartApi["setQty"]>((id, qty) => {
     setState((s) => {
       const lines = s.lines
-        .map((l) => (l.menuItemId === id ? { ...l, qty: Math.min(qty, 20) } : l))
+        .map((l) => (l.menuItemId === id ? { ...l, qty: Math.min(qty, MAX_LINE_QTY) } : l))
         .filter((l) => l.qty > 0);
       return lines.length ? { ...s, lines } : EMPTY;
     });

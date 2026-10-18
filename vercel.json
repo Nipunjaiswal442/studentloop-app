@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "buildCommand": "npx convex deploy --cmd 'npm run build'",
+  "buildCommand": "node scripts/deploy.mjs",
   "outputDirectory": "dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

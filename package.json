@@ -14,8 +14,8 @@
     "seed": "convex run seed:run"
   },
   "dependencies": {
-    "@auth/core": "^0.41.1",
-    "@convex-dev/auth": "^0.0.96",
+    "@firebase/app": "^0.16.3",
+    "@firebase/auth": "^1.13.7",
     "clsx": "^2.1.1",
     "convex": "^1.47.0",
     "lucide-react": "^0.562.0",
@@ -38,7 +38,6 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
-    "jose": "^6.2.12",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.3",

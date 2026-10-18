@@ -21,7 +21,7 @@ A campus delivery network. Students order from campus shops, post errands, or ea
 |-------|-----------|
 | Frontend | React 19, TypeScript, Vite 7, React Router 7, Tailwind CSS 3 |
 | Backend | [Convex](https://convex.dev): database, server functions, file storage, scheduler, realtime |
-| Auth | [Convex Auth](https://labs.convex.dev/auth): email and password, optional Google |
+| Auth | [Firebase Authentication](https://firebase.google.com/docs/auth): email and password, Google, password reset, email verification. Convex checks every Firebase ID token itself |
 | AI help | NVIDIA NIM (Qwen, with a Llama fallback), called from a Convex action |
 | Hosting | Vercel (frontend) and Convex Cloud (backend) |
 | Tests | Vitest and `convex-test` |
@@ -52,7 +52,8 @@ Errands work the same way, with a reward and tip and no item reimbursement. Cust
 ```
 convex/                  Backend (TypeScript)
   schema.ts              Tables and indexes
-  auth.ts, http.ts       Convex Auth setup
+  auth.config.ts         Trust Firebase ID tokens for one Firebase project
+  users.ts               Account setup on first sign-in, profile
   deliveries.ts          The job lifecycle: post, accept, purchase, deliver, cancel, rate
   orders.ts              Shop checkout (server-side pricing, escrow)
   wallet.ts, shops.ts, users.ts, disputes.ts, files.ts, help.ts, seed.ts
@@ -60,61 +61,79 @@ convex/                  Backend (TypeScript)
 src/
   pages/                 One file per screen
   components/            App shell, request card, stepper, UI primitives
-  lib/                   Cart, theme, formatting, domain labels, FAQ and terms text
+  lib/                   Firebase sign-in, cart, theme, formatting, domain labels, FAQ and terms text
 tests/                   Backend tests
-scripts/auth-keys.mjs    One-command auth key setup
+scripts/deploy.mjs       Vercel build: checks settings, deploys Convex, builds the site
 ```
+
+## How sign-in works
+
+Firebase owns identity: sign-up, sign-in, Google, password resets and verification emails all happen in the browser through the Firebase SDK. The app hands Convex the Firebase **ID token**, and Convex verifies it against Google's public keys (`convex/auth.config.ts`): right signature, issued for *this* Firebase project, not expired. No Convex Auth keys, no `SITE_URL`.
+
+On the first sign-in, `users.ensure` creates the StudentLoop account (wallet with the ₹500 welcome bonus). Accounts left over from the previous sign-in system are handed to their owner the first time they sign in with Firebase **using the same, verified email** (Google addresses are verified; for email and password, open the verification link first). They keep the wallet and history; phone, room and terms acceptance are cleared, since whoever registered the address back then may not have owned it.
 
 ## Local development
 
-You need Node 20+ and a free [Convex](https://convex.dev) account.
+You need Node 20+, a free [Convex](https://convex.dev) account and a Firebase project (see step 1 under Deploying).
 
 ```bash
 npm install
-npx convex dev            # first run: log in, create a project, pushes the backend and writes .env.local
+npx convex dev            # first run: log in and create a project; writes VITE_CONVEX_URL to .env.local
 ```
 
 In another terminal, once:
 
 ```bash
-node scripts/auth-keys.mjs                     # signing keys for Convex Auth
-npx convex env set SITE_URL http://localhost:5173
+npx convex env set FIREBASE_PROJECT_ID your-firebase-project-id
 npm run seed                                   # starter campus shops
 ```
 
-Then:
+Add the Firebase web config to `.env.local` (see `.env.example`), then:
 
 ```bash
 npm run dev               # http://localhost:5173
 ```
 
-Keep `npx convex dev` running while you work; it redeploys the backend on every save.
+Keep `npx convex dev` running while you work; it redeploys the backend on every save. Firebase allows `localhost` by default.
 
 ### Settings
 
-Backend settings live on the Convex deployment (`npx convex env set NAME value`, or the dashboard). They are **not** read from `.env.local`.
+| Name | Where | Required | Purpose |
+|------|-------|----------|---------|
+| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` | Vercel (and `.env.local`) | Yes | Firebase web config. Public values, baked into the site at build time |
+| `VITE_FIREBASE_APP_ID` | Vercel (and `.env.local`) | No | Also from the Firebase web config |
+| `CONVEX_DEPLOY_KEY` | Vercel | Yes | Lets the build deploy the backend. Use a **production** key |
+| `FIREBASE_PROJECT_ID` | Convex | Yes | Which Firebase project's tokens to accept. The Vercel build copies it from `VITE_FIREBASE_PROJECT_ID`; set it yourself only for local work |
+| `NVIDIA_API_KEY` | Convex | No | Turns on the AI assistant. Without it the FAQ still works |
 
-| Name | Required | Purpose |
-|------|----------|---------|
-| `JWT_PRIVATE_KEY`, `JWKS` | Yes | Set by `scripts/auth-keys.mjs` |
-| `SITE_URL` | Yes | Where the app is served, e.g. `http://localhost:5173` or your Vercel URL |
-| `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | No | Turns on "Continue with Google" (the button only appears when both are set) |
-| `NVIDIA_API_KEY` | No | Turns on the AI assistant. Without it the FAQ still works |
-
-`VITE_CONVEX_URL` is the only frontend variable. `npx convex dev` writes it for local work, and `convex deploy` supplies it to the Vercel build.
-
-**Google sign-in:** in Google Cloud Console, create an OAuth client and add `https://<your-deployment>.convex.site/api/auth/callback/google` as an authorised redirect URI.
+`VITE_CONVEX_URL` is filled in automatically: by `npx convex dev` locally and by `convex deploy` on Vercel. You don't need to set it.
 
 ## Deploying
 
-1. **Convex production:** in the Convex dashboard, open your project and create a production deploy key.
-2. **Vercel:** import the repo and add the environment variable `CONVEX_DEPLOY_KEY` (the production key). `vercel.json` already runs `npx convex deploy --cmd 'npm run build'`, which pushes the backend and builds the frontend against it.
-3. **Production settings:** set the backend settings above on the *production* deployment, with `SITE_URL` as your Vercel URL:
-   ```bash
-   node scripts/auth-keys.mjs --prod
-   npx convex env set --prod SITE_URL https://your-app.vercel.app
-   npx convex run --prod seed:run
-   ```
+1. **Firebase** ([console](https://console.firebase.google.com)):
+   - Create a project (or reuse one), then *Project settings > General > Your apps > Add app > Web*. Copy `apiKey`, `authDomain`, `projectId` (and `appId`).
+   - *Authentication > Sign-in method*: enable **Email/Password** and **Google**.
+   - *Authentication > Settings > Authorized domains*: add `studentloop-app.vercel.app` and any custom domain.
+2. **Convex**: in the dashboard, open the project, *Settings > Deploy keys*, create a **production** deploy key.
+3. **Vercel** (*Settings > Environment Variables*, Production): add `CONVEX_DEPLOY_KEY` and the three or four `VITE_FIREBASE_*` values, then redeploy. The build (`scripts/deploy.mjs`) stops with a list of anything missing; otherwise it copies the Firebase project id to Convex, deploys the backend and builds the site against it.
+4. **Shops**: if the shop list is empty, open the Convex dashboard, *Functions > seed:run > Run* (or `npx convex run --prod seed:run`). It does nothing when shops exist.
+5. Optional: set `NVIDIA_API_KEY` on the production deployment (Convex dashboard, *Settings > Environment Variables*).
+
+**Preview deployments** need their own Convex *preview* deploy key as `CONVEX_DEPLOY_KEY` in Vercel's Preview environment (never the production key there), plus `FIREBASE_PROJECT_ID` under the Convex project's default environment variables for previews. Without a key, preview builds stop with a message saying so; production is unaffected.
+
+**Leftovers from the previous sign-in system**, safe to delete in the Convex dashboard once you're happy: the environment variables `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and the tables `authAccounts`, `authSessions`, `authRefreshTokens`, `authVerificationCodes`, `authVerifiers`, `authRateLimits` (they hold old password hashes and nothing reads them).
+
+### If sign-in doesn't work
+
+| What you see | Fix |
+|---|---|
+| Vercel build fails with "StudentLoop can't be deployed yet" | Add the variables it lists, for the environment it names, and redeploy |
+| The site says "StudentLoop isn't fully set up" | The build ran without the `VITE_FIREBASE_*` values. Add them and redeploy |
+| "This sign-in method isn't switched on yet" | Enable it in Firebase, *Authentication > Sign-in method* |
+| "This website isn't on Firebase's list of authorized domains" | Add the domain in Firebase, *Authentication > Settings > Authorized domains* |
+| "We couldn't finish signing you in" | Convex's `FIREBASE_PROJECT_ID` doesn't match the site's Firebase project. Redeploy on Vercel (it copies the value across) |
+| "Sign-in is misconfigured: the Firebase API key isn't valid" | Re-copy `VITE_FIREBASE_API_KEY` from the Firebase web config and redeploy |
+| Reset or verification emails don't arrive | Check spam. Templates and sender are under Firebase *Authentication > Templates* |
 
 ## Scripts
 
@@ -131,7 +150,7 @@ Backend settings live on the Convex deployment (`npx convex env set NAME value`,
 ## Known limitations
 
 - **Top-ups are not real payments.** There is no payment gateway yet. Top-ups are validated and capped (₹10 to ₹5,000 each, ₹10,000 per day) and the UI says "test mode". Before real money is involved, replace `wallet.topUp` with a flow that verifies a completed payment.
-- **No email verification or password reset.** Accounts are never merged across sign-in methods (so an address can't be pre-claimed with a password and then taken over via Google), but there is no check that someone owns the email. College-domain enforcement is not implemented either.
+- **Email verification is encouraged, not required.** New email accounts are sent a verification link and the profile shows the status, but unverified accounts can still use the app. College-domain enforcement is not implemented.
 - **Reports are stored, not handled.** Disputes are saved with their photo; there is no admin screen to review them yet, and they do not move money.
 - **Uploads:** only images up to 5 MB are accepted when attached to an order or report, but an upload that is never attached is not cleaned up automatically.
 - The shop list is open to anyone signed in to add to, with no moderation.

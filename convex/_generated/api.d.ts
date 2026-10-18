@@ -8,12 +8,10 @@
  * @module
  */
 
-import type * as auth from "../auth.js";
 import type * as deliveries from "../deliveries.js";
 import type * as disputes from "../disputes.js";
 import type * as files from "../files.js";
 import type * as help from "../help.js";
-import type * as http from "../http.js";
 import type * as lib_constants from "../lib/constants.js";
 import type * as lib_ledger from "../lib/ledger.js";
 import type * as lib_uploads from "../lib/uploads.js";
@@ -32,12 +30,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  auth: typeof auth;
   deliveries: typeof deliveries;
   disputes: typeof disputes;
   files: typeof files;
   help: typeof help;
-  http: typeof http;
   "lib/constants": typeof lib_constants;
   "lib/ledger": typeof lib_ledger;
   "lib/uploads": typeof lib_uploads;

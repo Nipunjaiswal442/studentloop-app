@@ -1,4 +1,3 @@
-import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
@@ -33,13 +32,17 @@ export const txKind = v.union(
 );
 
 export default defineSchema({
-  ...authTables,
-
   users: defineTable({
-    // Fields managed by Convex Auth.
+    /**
+     * The Firebase identity ("<issuer>|<uid>") this account belongs to.
+     * Missing only on accounts created by the previous sign-in system, until
+     * their owner signs in with Firebase and claims them (see users.ensure).
+     */
+    tokenIdentifier: v.optional(v.string()),
+    email: v.optional(v.string()),
     name: v.optional(v.string()),
     image: v.optional(v.string()),
-    email: v.optional(v.string()),
+    // Written by the previous sign-in system; kept optional so old rows still validate.
     emailVerificationTime: v.optional(v.number()),
     phone: v.optional(v.string()),
     phoneVerificationTime: v.optional(v.number()),
@@ -59,7 +62,9 @@ export default defineSchema({
     trustScore: v.number(),
     rating: v.number(),
     ratingCount: v.number(),
-  }).index("email", ["email"]),
+  })
+    .index("by_token", ["tokenIdentifier"])
+    .index("by_email", ["email"]),
 
   shops: defineTable({
     ownerId: v.optional(v.id("users")),
@@ -132,7 +137,8 @@ export default defineSchema({
   })
     .index("by_status", ["status"])
     .index("by_requester", ["requesterId"])
-    .index("by_partner", ["partnerId"]),
+    .index("by_partner", ["partnerId"])
+    .index("by_partner_status", ["partnerId", "status"]),
 
   transactions: defineTable({
     userId: v.id("users"),

@@ -47,11 +47,11 @@ export const FAQ: { topic: string; items: { q: string; a: string }[] }[] = [
     items: [
       {
         q: "How do I sign up?",
-        a: "Create an account with your email and a password, or continue with Google. New accounts get a ₹500 welcome bonus in their wallet.",
+        a: "Create an account with your email and a password, or continue with Google. We'll email you a link to verify your address. New accounts get a ₹500 welcome bonus in their wallet.",
       },
       {
         q: "How do I reset my password?",
-        a: "Self-service reset isn't available yet. Email support@studentloop.com and we'll help.",
+        a: "On the sign-in page, choose Forgot password? and enter your email. We'll send you a link to choose a new one (check your spam folder). If you signed up with Google, use Continue with Google instead.",
       },
       {
         q: "What is the trust score?",

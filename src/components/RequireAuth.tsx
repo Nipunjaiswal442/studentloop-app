@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../convex/_generated/api";
 import { AppShell } from "@/components/AppShell";
 import { Logo } from "@/components/Logo";
 import { Prose } from "@/components/Prose";
 import { Button, Spinner } from "@/components/ui";
+import { signOut, takeSignUpName } from "@/lib/auth";
+import { errorMessage } from "@/lib/errors";
 import { TERMS } from "@/lib/legal";
 import { MeContext } from "@/lib/me";
 import { useSubmit } from "@/lib/submit";
@@ -19,39 +20,64 @@ function Splash() {
   );
 }
 
-/** Gate for everything inside the app: signed in, account loaded, terms accepted. */
+/** Gate for everything inside the app: signed in, account ready, terms accepted. */
 export function RequireAuth() {
   const { isLoading, isAuthenticated } = useConvexAuth();
-  const me = useQuery(api.users.me);
-  const location = useLocation();
+  const { pathname, search } = useLocation();
+  // Stable on purpose: <Navigate> re-runs whenever `state` changes, and a
+  // fresh object on every render would undo a navigation made meanwhile
+  // (e.g. sign-out sending the user to the landing page).
+  const redirectState = useMemo(() => ({ from: pathname + search }), [pathname, search]);
 
   if (isLoading) return <Splash />;
-  if (!isAuthenticated) {
-    return <Navigate to="/signin" replace state={{ from: location.pathname + location.search }} />;
-  }
-  if (me === undefined) return <Splash />;
-  if (me === null) return <AccountMissing />;
-  if (!me.termsAccepted) return <TermsGate />;
-
-  return (
-    <MeContext.Provider value={me}>
-      <AppShell />
-    </MeContext.Provider>
-  );
+  if (!isAuthenticated) return <Navigate to="/signin" replace state={redirectState} />;
+  return <AccountGate />;
 }
 
-function AccountMissing() {
-  const { signOut } = useAuthActions();
+function AccountGate() {
+  const ensure = useMutation(api.users.ensure);
+  const me = useQuery(api.users.me);
+  const [attempt, setAttempt] = useState(0);
+  const [failure, setFailure] = useState<string | null>(null);
+
+  // Creates the account on first sign-in and keeps the email in sync after that.
+  useEffect(() => {
+    let live = true;
+    ensure({ name: takeSignUpName() }).catch((e: unknown) => {
+      if (live) setFailure(errorMessage(e, "We couldn't set up your account."));
+    });
+    return () => {
+      live = false;
+    };
+  }, [ensure, attempt]);
+
+  if (me) {
+    if (!me.termsAccepted) return <TermsGate />;
+    return (
+      <MeContext.Provider value={me}>
+        <AppShell />
+      </MeContext.Provider>
+    );
+  }
+  if (!failure) return <Splash />;
   return (
     <div className="grid min-h-dvh place-items-center px-6 text-center">
       <div className="max-w-sm">
         <h1 className="text-xl font-semibold">We couldn't load your account</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Please sign out and sign in again. If this keeps happening, contact support@studentloop.com.
-        </p>
-        <Button className="mt-5" onClick={() => void signOut()}>
-          Sign out
-        </Button>
+        <p className="mt-2 text-sm text-muted-foreground">{failure}</p>
+        <div className="mt-5 flex justify-center gap-2">
+          <Button
+            onClick={() => {
+              setFailure(null);
+              setAttempt((n) => n + 1);
+            }}
+          >
+            Try again
+          </Button>
+          <Button variant="ghost" onClick={() => void signOut()}>
+            Sign out
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -59,7 +85,6 @@ function AccountMissing() {
 
 function TermsGate() {
   const accept = useMutation(api.users.acceptTerms);
-  const { signOut } = useAuthActions();
   const { pending, run } = useSubmit();
   const [agreed, setAgreed] = useState(false);
 
