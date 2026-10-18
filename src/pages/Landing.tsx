@@ -207,7 +207,8 @@ export default function Landing() {
             <a href="#safety" className="transition-colors hover:text-foreground">Safety</a>
           </nav>
           <div className="flex items-center gap-1 sm:gap-2">
-            <ThemeToggle />
+            {/* Phones follow the device theme; the toggle would squeeze the buttons. */}
+            <ThemeToggle className="hidden sm:grid" />
             {isAuthenticated ? (
               <LinkButton to="/shops" size="sm" className="sm:h-10 sm:px-4">
                 Open app
