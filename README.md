@@ -12,8 +12,9 @@ A campus delivery network. Students order from campus shops, post errands, or ea
 - **Wallet**: top-ups, escrow for every order, refunds, earnings and a full ledger.
 - **Live everywhere**: order status, carrier assignment, balances and badges update the moment something changes, with no refreshing.
 - **Trust**: ratings feed a trust score; issues can be reported with a photo; carriers only see a requester's room after accepting.
-- **Help desk**: an FAQ plus an AI assistant.
-- Responsive from phones (bottom tab bar) to desktop (sidebar), light and dark.
+- **Help desk**: an FAQ plus an AI assistant that knows the app and your current orders.
+- **Works like an app**: add it to your phone's home screen; it opens full screen and starts offline.
+- Responsive from phones (bottom tab bar) to desktop (sidebar), emerald light and dark themes, with motion that respects *Reduce motion*.
 
 ## Install on your phone
 
@@ -67,12 +68,14 @@ convex/                  Backend (TypeScript)
   deliveries.ts          The job lifecycle: post, accept, purchase, deliver, cancel, rate
   orders.ts              Shop checkout (server-side pricing, escrow)
   wallet.ts, shops.ts, users.ts, disputes.ts, files.ts, help.ts, seed.ts
-  lib/                   Ledger, validation, uploads, shared constants
+  lib/                   Ledger, validation, uploads, shared constants,
+                         knowledge.ts (FAQ, terms, the assistant's guide), assistant.ts
 src/
   pages/                 One file per screen
   components/            App shell, request card, stepper, UI primitives
-  lib/                   Firebase sign-in, cart, theme, formatting, domain labels, FAQ and terms text
-tests/                   Backend tests
+  lib/                   Firebase sign-in, cart, theme, formatting, domain labels
+public/                  Icons, web app manifest and service worker (home-screen app)
+tests/                   Backend, assistant and colour-contrast tests
 scripts/deploy.mjs       Vercel build: checks settings, deploys Convex, builds the site
 ```
 
@@ -127,7 +130,7 @@ Keep `npx convex dev` running while you work; it redeploys the backend on every 
 2. **Convex**: in the dashboard, open the project, *Settings > Deploy keys*, create a **production** deploy key.
 3. **Vercel** (*Settings > Environment Variables*, Production): add `CONVEX_DEPLOY_KEY` and the three or four `VITE_FIREBASE_*` values, then redeploy. The build (`scripts/deploy.mjs`) stops with a list of anything missing; otherwise it copies the Firebase project id to Convex, deploys the backend and builds the site against it.
 4. **Shops**: if the shop list is empty, open the Convex dashboard, *Functions > seed:run > Run* (or `npx convex run --prod seed:run`). It does nothing when shops exist.
-5. Optional: set `NVIDIA_API_KEY` on the production deployment (Convex dashboard, *Settings > Environment Variables*).
+5. Optional, the help assistant: add `NVIDIA_API_KEY` in Vercel (Production) and redeploy, or set it on the Convex deployment. See [Help assistant](#help-assistant).
 
 **Preview deployments** need their own Convex *preview* deploy key as `CONVEX_DEPLOY_KEY` in Vercel's Preview environment (never the production key there), plus `FIREBASE_PROJECT_ID` under the Convex project's default environment variables for previews. Without a key, preview builds stop with a message saying so; production is unaffected.
 
@@ -174,6 +177,7 @@ The chat on the Help page runs on [NVIDIA NIM](https://build.nvidia.com). To swi
 - **Reports are stored, not handled.** Disputes are saved with their photo; there is no admin screen to review them yet, and they do not move money.
 - **Uploads:** only images up to 5 MB are accepted when attached to an order or report, but an upload that is never attached is not cleaned up automatically.
 - The shop list is open to anyone signed in to add to, with no moderation.
+- **The assistant's model ids** (Qwen 3.5 122B first) couldn't be checked against NVIDIA's live catalogue when this was written. It asks NVIDIA which models exist and falls back automatically; set `NVIDIA_MODEL` if you want a specific one.
 
 ## License
 
