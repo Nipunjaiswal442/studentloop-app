@@ -94,6 +94,14 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+  /* Room for the iPhone status bar and home indicator when the app runs
+     full-screen from the home screen (index.html uses viewport-fit=cover). */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

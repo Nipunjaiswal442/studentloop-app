@@ -1,6 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: 'class',
+  // hover: styles only on devices that can hover, so taps on phones don't leave them stuck on.
+  future: { hoverOnlyWhenSupported: true },
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
