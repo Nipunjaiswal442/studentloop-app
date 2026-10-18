@@ -1,0 +1,49 @@
+{
+  "id": "/",
+  "name": "StudentLoop",
+  "short_name": "StudentLoop",
+  "description": "Campus delivery by students, for students. Order from campus shops, post errands, or earn by delivering.",
+  "start_url": "/shops",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#047857",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["food", "shopping", "lifestyle"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Shop",
+      "short_name": "Shop",
+      "description": "Order from campus shops",
+      "url": "/shops",
+      "icons": [{ "src": "/icons/shortcut-shop.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Orders",
+      "short_name": "Orders",
+      "description": "Track your orders and errands",
+      "url": "/orders",
+      "icons": [{ "src": "/icons/shortcut-orders.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Deliver",
+      "short_name": "Deliver",
+      "description": "Pick up a delivery and earn",
+      "url": "/deliver",
+      "icons": [{ "src": "/icons/shortcut-deliver.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Wallet",
+      "short_name": "Wallet",
+      "description": "Check your balance and top up",
+      "url": "/wallet",
+      "icons": [{ "src": "/icons/shortcut-wallet.png", "sizes": "96x96", "type": "image/png" }]
+    }
+  ]
+}

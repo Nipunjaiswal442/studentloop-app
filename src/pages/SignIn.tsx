@@ -117,7 +117,7 @@ export default function SignIn() {
   }[mode];
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-2">
+    <div className="min-h-dvh pt-safe lg:grid lg:grid-cols-2 lg:pt-0">
       <aside className="hidden flex-col justify-between bg-subtle p-12 lg:flex">
         <Logo />
         <div className="max-w-md">

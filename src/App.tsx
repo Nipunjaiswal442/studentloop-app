@@ -57,7 +57,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
-      <Toaster position="top-center" theme={theme} mobileOffset={{ top: 64 }} />
+      <Toaster position="top-center" theme={theme} mobileOffset={{ top: "calc(64px + env(safe-area-inset-top))" }} />
     </CartProvider>
   );
 }

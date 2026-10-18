@@ -102,7 +102,7 @@ export function AppShell() {
 
       <div className="flex min-h-dvh min-w-0 flex-col">
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-30 box-content flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 pt-safe backdrop-blur lg:hidden">
           <Logo to="/shops" />
           <div className="flex items-center gap-1">
             <NavLink

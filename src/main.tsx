@@ -23,3 +23,13 @@ createRoot(document.getElementById("root")!).render(
     )}
   </StrictMode>,
 );
+
+// Offline start-up for the home-screen app (public/sw.js). Production only, so
+// the dev server never serves cached files.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
+      // Not fatal: the site works the same without it, just not offline.
+    });
+  });
+}

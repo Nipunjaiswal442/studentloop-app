@@ -5,6 +5,7 @@ import { BadgeCheck, ChevronRight, FileText, LifeBuoy, LogOut, MailWarning, Moon
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import { Avatar } from "@/components/AppShell";
+import { InstallApp } from "@/components/InstallApp";
 import { Button, Card, Field, Input, PageHeader } from "@/components/ui";
 import {
   authErrorMessage,
@@ -137,6 +138,8 @@ export default function Profile() {
           </Card>
 
           <AccountCard />
+
+          <InstallApp />
 
           <Card>
             <h2 className="font-semibold">Appearance</h2>

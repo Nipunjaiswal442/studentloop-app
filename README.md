@@ -15,6 +15,16 @@ A campus delivery network. Students order from campus shops, post errands, or ea
 - **Help desk**: an FAQ plus an AI assistant.
 - Responsive from phones (bottom tab bar) to desktop (sidebar), light and dark.
 
+## Install on your phone
+
+StudentLoop can live on your home screen like an app: its own icon, full screen, and it opens even without a connection (your data loads once you're back online).
+
+- **iPhone or iPad:** open the site in Safari, tap **Share** (if you don't see it, tap **•••** first), then **Add to Home Screen**, then **Add**.
+- **Android:** in Chrome, open the **⋮** menu and choose **Install app** or **Add to Home screen**. When Chrome offers it, the Profile page also has an **Install app** button.
+- **Computer:** in Chrome or Edge, click the install icon in the address bar. In Safari on a Mac, choose **File > Add to Dock**.
+
+The Profile page shows the right steps for the device you're on. Under the hood: `public/manifest.webmanifest`, the icons in `public/icons/`, and a small service worker (`public/sw.js`) that keeps the app shell and build files for offline starts. If you change what `sw.js` caches, bump its `VERSION`.
+
 ## Stack
 
 | Layer | Technology |
