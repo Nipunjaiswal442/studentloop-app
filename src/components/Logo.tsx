@@ -17,11 +17,15 @@ function LogoMark({ className }: { className?: string }) {
   );
 }
 
-export function Logo({ to = "/", className }: { to?: string; className?: string }) {
+/**
+ * `compact` shows only the mark below 360px, for crowded headers. The name stays
+ * in the link for screen readers.
+ */
+export function Logo({ to = "/", className, compact }: { to?: string; className?: string; compact?: boolean }) {
   return (
-    <Link to={to} className={cn("inline-flex items-center gap-2.5", className)}>
+    <Link to={to} className={cn("inline-flex items-center gap-2.5 transition-opacity active:opacity-80", className)}>
       <LogoMark />
-      <span className="text-lg font-semibold tracking-tight">StudentLoop</span>
+      <span className={cn("text-lg font-semibold tracking-tight", compact && "max-[359px]:sr-only")}>StudentLoop</span>
     </Link>
   );
 }

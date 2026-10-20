@@ -89,7 +89,8 @@ export default function WalletPage() {
               Top-ups, orders and earnings show up here.
             </EmptyState>
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-card shadow-card">
+            // Rounded end rows keep the press colour inside the list's corners.
+            <ul className="divide-y divide-border rounded-xl border border-border bg-card shadow-card [&>li:first-child>a]:rounded-t-xl [&>li:last-child>a]:rounded-b-xl">
               {wallet.transactions.map((t) => {
                 const Row = (
                   <div className="flex items-center gap-3 p-4">
@@ -114,7 +115,10 @@ export default function WalletPage() {
                 return (
                   <li key={t.id}>
                     {t.deliveryRequestId ? (
-                      <Link to={`/orders/${t.deliveryRequestId}`} className="block hover:bg-subtle">
+                      <Link
+                        to={`/orders/${t.deliveryRequestId}`}
+                        className="block transition-colors hover:bg-subtle active:bg-subtle"
+                      >
                         {Row}
                       </Link>
                     ) : (

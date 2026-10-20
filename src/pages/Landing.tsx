@@ -110,7 +110,7 @@ const SAFETY = [
   {
     icon: Lock,
     title: "Limited sharing",
-    text: "Other students see your first name and hostel. Your room number and phone number go only to the person you're matched with.",
+    text: "Other students see your first name, last initial and hostel. Your room number and phone number go only to the person you're matched with.",
   },
   {
     icon: Star,
@@ -200,11 +200,11 @@ export default function Landing() {
         )}
       >
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
-          <Logo />
+          <Logo compact />
           <nav aria-label="Sections" className="hidden gap-8 text-sm text-muted-foreground md:flex">
-            <a href="#how" className="transition-colors hover:text-foreground">How it works</a>
-            <a href="#features" className="transition-colors hover:text-foreground">Features</a>
-            <a href="#safety" className="transition-colors hover:text-foreground">Safety</a>
+            <a href="#how" className="transition-colors hover:text-foreground active:text-foreground">How it works</a>
+            <a href="#features" className="transition-colors hover:text-foreground active:text-foreground">Features</a>
+            <a href="#safety" className="transition-colors hover:text-foreground active:text-foreground">Safety</a>
           </nav>
           <div className="flex items-center gap-1 sm:gap-2">
             {/* Phones follow the device theme; the toggle would squeeze the buttons. */}
@@ -265,7 +265,8 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="motion-safe:animate-rise" style={delay(200)}>
+          {/* min-w-0 so the demo's one-line rows truncate instead of widening the column. */}
+          <div className="min-w-0 motion-safe:animate-rise" style={delay(200)}>
             <OrderDemo />
           </div>
         </section>
@@ -371,8 +372,8 @@ export default function Landing() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:px-6">
           <Logo />
           <div className="flex gap-6">
-            <Link to="/terms" className="transition-colors hover:text-foreground">Terms</Link>
-            <a href="mailto:support@studentloop.com" className="transition-colors hover:text-foreground">Contact</a>
+            <Link to="/terms" className="transition-colors hover:text-foreground active:text-foreground">Terms</Link>
+            <a href="mailto:support@studentloop.com" className="transition-colors hover:text-foreground active:text-foreground">Contact</a>
           </div>
           <p>© {new Date().getFullYear()} StudentLoop</p>
         </div>
@@ -499,8 +500,9 @@ function OrderDemo() {
             <div className="mx-auto mt-2 h-1.5 w-16 rounded-full bg-border" />
             <div key={loop} className={cn("p-4 pt-3", loop > 0 && "motion-safe:animate-enter")}>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">Order SL-4821 · Example</span>
-                <Badge key={step} tone={stageTone(stage)} className="motion-safe:animate-enter">
+                {/* Nothing in the demo may wrap, or the card's height would change between stages. */}
+                <span className="min-w-0 truncate text-xs text-muted-foreground">Order SL-4821 · Example</span>
+                <Badge key={step} tone={stageTone(stage)} className="shrink-0 motion-safe:animate-enter">
                   {STAGE_LABEL[stage]}
                 </Badge>
               </div>
@@ -573,11 +575,11 @@ function OrderDemo() {
                 )}
               >
                 <div className="flex items-center justify-between gap-2 text-xs">
-                  <span className="flex items-center gap-1.5 font-medium">
+                  <span className="flex shrink-0 items-center gap-1.5 font-medium">
                     <KeyRound className="size-3.5 text-primary" />
                     Your delivery code
                   </span>
-                  <span key={step} className="text-muted-foreground motion-safe:animate-enter">
+                  <span key={step} className="min-w-0 truncate text-muted-foreground motion-safe:animate-enter">
                     {step === 0
                       ? "After a carrier accepts"
                       : step === 3
@@ -614,13 +616,14 @@ function OrderDemo() {
               </div>
 
               <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm">
-                <span className="text-muted-foreground">Total</span>
-                <span className="tabular font-semibold">
-                  ₹{DEMO_TOTAL}{" "}
-                  <span key={String(delivered)} className="font-normal text-muted-foreground motion-safe:animate-enter">
+                {/* The changing word sits on the left so the right-aligned amount never moves. */}
+                <span className="text-muted-foreground">
+                  Total{" "}
+                  <span key={String(delivered)} className="motion-safe:animate-enter">
                     {delivered ? "paid out" : "held"}
                   </span>
                 </span>
+                <span className="tabular font-semibold">₹{DEMO_TOTAL}</span>
               </div>
             </div>
           </div>

@@ -120,14 +120,18 @@ export default function Profile() {
 
         <aside className="space-y-6">
           <Card className="p-0 sm:p-0">
-            <ul className="divide-y divide-border">
+            {/* Rounded end rows keep the press colour inside the card's corners. */}
+            <ul className="divide-y divide-border [&>li:first-child>a]:rounded-t-xl [&>li:last-child>a]:rounded-b-xl">
               {[
                 { to: "/orders", label: "Your orders", icon: ReceiptText },
                 { to: "/help", label: "Help", icon: LifeBuoy },
                 { to: "/terms", label: "Terms and conditions", icon: FileText },
               ].map((l) => (
                 <li key={l.to}>
-                  <Link to={l.to} className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium hover:bg-subtle">
+                  <Link
+                    to={l.to}
+                    className="flex items-center gap-3 px-4 py-3.5 text-sm font-medium transition-colors hover:bg-subtle active:bg-subtle"
+                  >
                     <l.icon className="size-4 text-muted-foreground" aria-hidden />
                     <span className="flex-1">{l.label}</span>
                     <ChevronRight className="size-4 text-muted-foreground" aria-hidden />

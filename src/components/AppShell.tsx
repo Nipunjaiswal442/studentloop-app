@@ -103,25 +103,25 @@ export function AppShell() {
       <div className="flex min-h-dvh min-w-0 flex-col">
         {/* Mobile top bar */}
         <header className="sticky top-0 z-30 box-content flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 pt-safe backdrop-blur lg:hidden">
-          <Logo to="/shops" />
+          <Logo to="/shops" compact />
           <div className="flex items-center gap-1">
             <NavLink
               to="/wallet"
-              className="tabular rounded-full bg-primary-soft px-3 py-1.5 text-sm font-semibold text-primary-soft-foreground"
+              className="tabular rounded-full bg-primary-soft px-3 py-1.5 text-sm font-semibold text-primary-soft-foreground transition-transform duration-150 ease-smooth active:scale-[0.96]"
             >
               {money(me.walletBalance)}
             </NavLink>
             <NavLink
               to="/help"
               aria-label="Help"
-              className="grid size-10 place-items-center rounded-full text-muted-foreground hover:bg-subtle"
+              className="grid size-10 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-subtle active:bg-subtle"
             >
               <LifeBuoy className="size-5" />
             </NavLink>
             <NavLink
               to="/cart"
               aria-label={`Cart, ${cart.count} items`}
-              className="relative grid size-10 place-items-center rounded-full text-muted-foreground hover:bg-subtle"
+              className="relative grid size-10 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-subtle active:bg-subtle"
             >
               <ShoppingCart className="size-5" />
               {cart.count > 0 && (
@@ -205,7 +205,7 @@ function SideLink({ item }: { item: NavItem }) {
           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
           on
             ? "bg-primary-soft text-primary-soft-foreground"
-            : "text-muted-foreground hover:bg-subtle hover:text-foreground",
+            : "text-muted-foreground hover:bg-subtle hover:text-foreground active:bg-subtle",
         )
       }
     >
