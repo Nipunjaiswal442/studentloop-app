@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { convexTest } from "convex-test";
+import { ConvexError } from "convex/values";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
@@ -18,6 +20,7 @@ import {
   looksLikeChatModel,
   modelOrder,
   parseModelList,
+  requestBody,
   type AccountSummary,
 } from "../convex/lib/assistant";
 import {
@@ -34,12 +37,17 @@ import {
   TOPUP_MIN,
   WELCOME_BONUS,
 } from "../convex/lib/constants";
-import { FAQ, TERMS, rupees } from "../convex/lib/knowledge";
+import { APP_GUIDE, FAQ, TERMS, rupees } from "../convex/lib/knowledge";
+import { clearHelpChat, getHelpChat, retryHelpQuestion, sendHelpQuestion, type Ask } from "../src/lib/helpChat";
 
 /* ───────────── Pure logic ───────────── */
 
 describe("model order", () => {
   const [first, second, third, fourth] = PREFERRED_MODELS;
+
+  it("starts with Llama 3.3, which answers without reasoning first", () => {
+    expect(PREFERRED_MODELS.slice(0, 2)).toEqual(["meta/llama-3.3-70b-instruct", "qwen/qwen3.5-122b-a10b"]);
+  });
 
   it("uses the preference list when the model listing failed", () => {
     expect(modelOrder({ listed: null })).toEqual([first, second, third]);
@@ -145,6 +153,13 @@ describe("reply cleanup", () => {
     expect(extractReply({ choices: [{ message: { content: " Hi! ", reasoning_content: "x" } }] })).toBe("Hi!");
     expect(extractReply({})).toBe("");
   });
+
+  it("marks a reply cut off by the token limit", () => {
+    const reply = (content: string, finish_reason: string) => ({ choices: [{ message: { content }, finish_reason }] });
+    expect(extractReply(reply("Open **Wallet** and tap", "length"))).toBe("Open **Wallet** and tap…");
+    expect(extractReply(reply("Open **Wallet**.", "stop"))).toBe("Open **Wallet**.");
+    expect(extractReply(reply("<think>still working it out", "length"))).toBe("");
+  });
 });
 
 describe("system prompt and knowledge", () => {
@@ -193,6 +208,17 @@ describe("system prompt and knowledge", () => {
     expect(faq).toContain(`Up to ${MAX_ACTIVE_JOBS} at a time`);
     expect(TERMS).toMatch(/processed by NVIDIA/);
   });
+
+  it("gives the same home screen steps as the Get the app card on Profile", () => {
+    const card = readFileSync(new URL("../src/components/InstallApp.tsx", import.meta.url), "utf8");
+    const install = APP_GUIDE.split("\n").find((line) => line.startsWith("- Install on your home screen:")) ?? "";
+    expect(card).toContain("Get the app");
+    expect(install).toContain("Get the app card on Profile");
+    expect(card).toMatch(/Don't see it\? Tap.*More.*\(•••\).*first/s);
+    expect(install).toContain("tap Share (if you don't see it, tap ••• first), scroll down, tap Add to Home Screen, then Add");
+    expect(card).toContain("Install app");
+    expect(install).toContain("tap Install app on that card");
+  });
 });
 
 describe("chat request", () => {
@@ -203,7 +229,7 @@ describe("chat request", () => {
       role: i % 2 === 0 ? ("user" as const) : ("assistant" as const),
       text: `turn ${i} ${"x".repeat(1500)}`,
     }));
-    const messages = buildMessages({ summary, history, message: "What now?", model: "meta/llama-3.3-70b-instruct" });
+    const messages = buildMessages({ summary, history, message: "What now?" });
 
     expect(messages[0].role).toBe("system");
     expect(messages[0].content).toContain(SYSTEM_PROMPT);
@@ -234,9 +260,21 @@ describe("chat request", () => {
     ]);
   });
 
-  it("asks Qwen 3 models not to think out loud", () => {
-    const messages = buildMessages({ summary, history: [], message: "Hi", model: "qwen/qwen3.5-122b-a10b" });
-    expect(messages[0].content.endsWith("/no_think")).toBe(true);
+  it("switches off Qwen 3 thinking in the request, and only for Qwen 3", () => {
+    const messages = buildMessages({ summary, history: [], message: "Hi" });
+    for (const model of ["qwen/qwen3.5-122b-a10b", "qwen/qwen3-235b-a22b"]) {
+      expect(requestBody(model, messages)).toEqual({
+        model,
+        messages,
+        temperature: 0.3,
+        max_tokens: 700,
+        stream: false,
+        chat_template_kwargs: { enable_thinking: false },
+      });
+    }
+    for (const model of ["meta/llama-3.3-70b-instruct", "qwen/qwen2.5-72b-instruct"]) {
+      expect(requestBody(model, messages)).not.toHaveProperty("chat_template_kwargs");
+    }
   });
 
   it("formats the account summary", () => {
@@ -500,7 +538,7 @@ describe("help.ask", () => {
     const alice = await makeUser(t, "Alice");
     await placeOrder(alice, await makeShop(t));
     const nim = stubNvidia({
-      models: ["nvidia/nv-embed-v1", PREFERRED_MODELS[1], PREFERRED_MODELS[3]],
+      models: ["nvidia/nv-embed-v1", "qwen/qwen3.5-122b-a10b", "meta/llama-3.3-70b-instruct"],
       chat: ["<think>They want the order status.</think>\n\nYour **Biryani** order is waiting for a carrier."],
     });
 
@@ -517,10 +555,17 @@ describe("help.ask", () => {
     const [chat] = nim.chats();
     expect(nim.chats()).toHaveLength(1);
     expect(chat.authorization).toBe("Bearer nvapi-secret-key");
-    expect(chat.body).toMatchObject({ model: PREFERRED_MODELS[1], temperature: 0.3, max_tokens: 700, stream: false });
+    expect(chat.body).toMatchObject({
+      model: "meta/llama-3.3-70b-instruct",
+      temperature: 0.3,
+      max_tokens: 700,
+      stream: false,
+    });
+    expect(chat.body).not.toHaveProperty("chat_template_kwargs");
     const messages = chat.body?.messages as { role: string; content: string }[];
     expect(messages.map((m) => m.role)).toEqual(["system", "user", "assistant", "user"]);
     expect(messages[0].content).toContain("First name: Alice");
+    expect(messages[0].content).not.toContain("/no_think");
     expect(messages[0].content).toContain('Shop order "Biryani" from Canteen: Waiting for a carrier.');
     expect(messages[3].content).toBe("Where is my order?");
     expect(warn).not.toHaveBeenCalled();
@@ -555,6 +600,10 @@ describe("help.ask", () => {
     });
     expect(nim.chats().map((c) => c.body?.model)).toEqual([PREFERRED_MODELS[0], PREFERRED_MODELS[1]]);
     expect(warn).toHaveBeenCalledWith(`NVIDIA model ${PREFERRED_MODELS[0]} answered HTTP 404`);
+    // The same conversation goes to the fallback, with Qwen's thinking switched off.
+    const [llama, qwen] = nim.chats();
+    expect(qwen.body?.messages).toEqual(llama.body?.messages);
+    expect(qwen.body?.chat_template_kwargs).toEqual({ enable_thinking: false });
 
     // The missing model is skipped for a while.
     const again = stubNvidia({ models: 500, chat: ["Again"] });
@@ -596,5 +645,102 @@ describe("help.ask", () => {
       /between 1 and 500/,
     );
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+/* ───────────── Help page chat ───────────── */
+
+describe("help chat store", () => {
+  let storage: Map<string, string>;
+  let user = 0;
+  beforeEach(() => {
+    storage = new Map();
+    vi.stubGlobal("sessionStorage", {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => void storage.set(k, v),
+      removeItem: (k: string) => void storage.delete(k),
+    });
+  });
+  // The store lives for the whole tab, so each test gets its own user.
+  const nextUser = () => `user${++user}`;
+  const stored = (id: string) => JSON.parse(storage.get(`sl_help_chat_${id}`) ?? "[]") as { role: string; text: string }[];
+  const settled = () => new Promise((r) => setTimeout(r, 0));
+
+  /** An ask() whose answers the test hands out one at a time. */
+  function slowAsk() {
+    const waiting: { resolve: (r: { reply: string }) => void; reject: (e: unknown) => void }[] = [];
+    const ask = vi.fn<Ask>(() => new Promise((resolve, reject) => waiting.push({ resolve, reject })));
+    return { ask, next: () => waiting.shift()! };
+  }
+
+  it("keeps a reply that arrives after leaving Help, and asks only once meanwhile", async () => {
+    const id = nextUser();
+    const { ask, next } = slowAsk();
+    expect(sendHelpQuestion(id, ask, "  How do I add money?  ")).toBe(true);
+    expect(getHelpChat(id).asking).not.toBeNull();
+    expect(stored(id)).toEqual([expect.objectContaining({ role: "user", text: "How do I add money?" })]);
+
+    // Coming back to Help mid-question: no second request.
+    expect(sendHelpQuestion(id, ask, "Hello?")).toBe(false);
+    retryHelpQuestion(id, ask);
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(ask).toHaveBeenCalledWith({ message: "How do I add money?", history: [] });
+
+    next().resolve({ reply: "Open **Wallet**." });
+    await vi.waitFor(() => expect(getHelpChat(id).asking).toBeNull());
+    expect(getHelpChat(id).messages.map((m) => m.text)).toEqual(["How do I add money?", "Open **Wallet**."]);
+    expect(stored(id).map((m) => m.text)).toEqual(["How do I add money?", "Open **Wallet**."]);
+  });
+
+  it("retries a failed answer with the same question and the answered history", async () => {
+    const id = nextUser();
+    const { ask, next } = slowAsk();
+    sendHelpQuestion(id, ask, "Hi");
+    next().resolve({ reply: "Hello!" });
+    await vi.waitFor(() => expect(getHelpChat(id).asking).toBeNull());
+
+    sendHelpQuestion(id, ask, "Where is my order?");
+    next().reject(new ConvexError("The assistant is busy. Try again in a moment."));
+    await vi.waitFor(() => expect(getHelpChat(id).asking).toBeNull());
+    expect(getHelpChat(id).messages.at(-1)).toMatchObject({ text: "The assistant is busy. Try again in a moment.", failed: true });
+
+    retryHelpQuestion(id, ask);
+    expect(getHelpChat(id).messages.map((m) => m.text)).toEqual(["Hi", "Hello!", "Where is my order?"]);
+    expect(ask).toHaveBeenLastCalledWith({
+      message: "Where is my order?",
+      history: [
+        { role: "user", text: "Hi" },
+        { role: "assistant", text: "Hello!" },
+      ],
+    });
+    next().resolve({ reply: "On its way." });
+    await vi.waitFor(() => expect(getHelpChat(id).asking).toBeNull());
+    expect(stored(id).map((m) => m.text)).toEqual(["Hi", "Hello!", "Where is my order?", "On its way."]);
+  });
+
+  it("drops a late reply once the chat is cleared or the person has signed out", async () => {
+    const id = nextUser();
+    const { ask, next } = slowAsk();
+    sendHelpQuestion(id, ask, "First");
+    clearHelpChat(id);
+    next().resolve({ reply: "Too late" });
+    await settled();
+    expect(getHelpChat(id).messages).toEqual([]);
+
+    sendHelpQuestion(id, ask, "Second");
+    // Signing out removes every sl_help_chat_ key.
+    storage.clear();
+    next().resolve({ reply: "Also too late" });
+    await settled();
+    expect(getHelpChat(id)).toMatchObject({ messages: [], asking: null });
+    expect(storage.size).toBe(0);
+  });
+
+  it("keeps each person's chat separate", () => {
+    const [a, b] = [nextUser(), nextUser()];
+    const { ask } = slowAsk();
+    sendHelpQuestion(a, ask, "Mine");
+    expect(getHelpChat(b).messages).toEqual([]);
+    expect(sendHelpQuestion(b, ask, "Theirs")).toBe(true);
   });
 });

@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useAction, useQuery } from "convex/react";
 import { ChevronDown, MessageCircleQuestion, RotateCcw, Send, Sparkles, SquarePen } from "lucide-react";
 import { api } from "../../convex/_generated/api";
-import { MAX_HISTORY_TURNS, MAX_MESSAGE_CHARS } from "../../convex/lib/assistant";
+import { MAX_MESSAGE_CHARS } from "../../convex/lib/assistant";
 import { FAQ, SUPPORT_EMAIL } from "../../convex/lib/knowledge";
 import { Button, Card, Input, PageHeader, Skeleton } from "@/components/ui";
 import { isActive } from "@/lib/domain";
-import { errorMessage } from "@/lib/errors";
+import { clearHelpChat, retryHelpQuestion, sendHelpQuestion, useHelpChat } from "@/lib/helpChat";
 import { useMe } from "@/lib/me";
 import { cn } from "@/lib/utils";
-
-type Message = { id: string; role: "user" | "assistant"; text: string; failed?: boolean };
 
 const SUGGESTIONS = [
   "How does the delivery code work?",
@@ -21,8 +20,11 @@ const SUGGESTIONS = [
 ];
 
 // Tall enough for a conversation, short enough that the question box clears
-// the phone tab bar without scrolling.
-const CHAT_HEIGHT = "h-[min(38rem,calc(100dvh-14rem))] min-h-[24rem]";
+// the phone tab bar without scrolling. 15.5rem is the top bar, the page title
+// (two lines on narrow phones) and the tab bar; in the home-screen app those
+// bars also grow by the notch and home indicator insets.
+const CHAT_HEIGHT =
+  "h-[min(38rem,calc(100dvh-15.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] min-h-[18rem]";
 
 export default function Help() {
   const status = useQuery(api.help.status);
@@ -101,61 +103,17 @@ function Faq({ wide, className }: { wide: boolean; className?: string }) {
 
 /* ───────────── Chat ───────────── */
 
-const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-
-// sessionStorage can be missing or full (private mode, quotas): the chat then
-// simply isn't kept, it still works.
-function loadChat(key: string): Message[] {
-  try {
-    const parsed: unknown = JSON.parse(sessionStorage.getItem(key) ?? "[]");
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (m): m is Message =>
-        typeof m === "object" &&
-        m !== null &&
-        typeof m.id === "string" &&
-        (m.role === "user" || m.role === "assistant") &&
-        typeof m.text === "string",
-    );
-  } catch {
-    return [];
-  }
-}
-
-function saveChat(key: string, messages: Message[]) {
-  try {
-    if (messages.length) sessionStorage.setItem(key, JSON.stringify(messages.slice(-40)));
-    else sessionStorage.removeItem(key);
-  } catch {
-    // Not kept for this tab; nothing else depends on it.
-  }
-}
-
-/** The answered turns, as the server wants them: failed replies and their questions are left out. */
-function historyOf(list: Message[]) {
-  const turns: { role: "user" | "assistant"; text: string }[] = [];
-  list.forEach((m, i) => {
-    const next = list[i + 1];
-    if (m.failed || (m.role === "user" && (next?.role !== "assistant" || next.failed))) return;
-    turns.push({ role: m.role, text: m.text });
-  });
-  return turns.slice(-MAX_HISTORY_TURNS);
-}
-
 function Chat({ className }: { className?: string }) {
   const me = useMe();
   const ask = useAction(api.help.ask);
   const requested = useQuery(api.deliveries.listRequested);
-  const key = `sl_help_chat_${me.id}`;
-  const [messages, setMessages] = useState<Message[]>(() => loadChat(key));
+  const { messages, asking } = useHelpChat(me.id);
+  const pending = asking !== null;
   const [input, setInput] = useState("");
-  const [pending, setPending] = useState(false);
   const log = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
   const refocus = useRef(false);
   const opened = useRef(false);
-
-  useEffect(() => saveChat(key, messages), [key, messages]);
 
   // Keep the newest message in view by scrolling the conversation, never the
   // page: jump there when the page opens, glide for new messages. An empty
@@ -181,42 +139,29 @@ function Chat({ className }: { className?: string }) {
     }
   }, [pending]);
 
-  async function run(question: string, before: Message[]) {
-    setPending(true);
-    try {
-      const { reply } = await ask({ message: question, history: historyOf(before) });
-      setMessages((m) => [...m, { id: newId(), role: "assistant", text: reply }]);
-    } catch (err) {
-      const text = errorMessage(err, "The assistant couldn't answer just now. Please try again.");
-      setMessages((m) => [...m, { id: newId(), role: "assistant", text, failed: true }]);
-    } finally {
-      setPending(false);
-    }
-  }
+  // Suggestions and Retry disappear once a question is on its way, and the
+  // field is disabled. Focus moves to the conversation first, so keyboard and
+  // screen reader users stay where the answer will appear.
+  const focusLog = () => log.current?.focus({ preventScroll: true });
 
   function send(text: string, fromField = false) {
-    const question = text.trim().slice(0, MAX_MESSAGE_CHARS);
-    if (!question || pending) return;
+    if (pending || !text.trim()) return;
     refocus.current = fromField && window.matchMedia("(pointer: fine)").matches;
-    setMessages([...messages, { id: newId(), role: "user", text: question }]);
+    if (!refocus.current) focusLog();
     setInput("");
-    void run(question, messages);
+    sendHelpQuestion(me.id, ask, text);
   }
 
-  /** Asks the last question again: after a failed reply, or one that never came back. */
   function retry() {
-    const last = messages[messages.length - 1];
-    const at = last?.failed ? messages.length - 2 : messages.length - 1;
-    const question = messages[at];
-    if (pending || question?.role !== "user") return;
-    setMessages(messages.slice(0, at + 1));
-    void run(question.text, messages.slice(0, at));
+    focusLog();
+    retryHelpQuestion(me.id, ask);
   }
 
   function newChat() {
-    setMessages([]);
+    clearHelpChat(me.id);
     setInput("");
     if (window.matchMedia("(pointer: fine)").matches) field.current?.focus();
+    else focusLog();
   }
 
   const last = messages[messages.length - 1];
@@ -226,33 +171,40 @@ function Chat({ className }: { className?: string }) {
 
   return (
     <Card className={cn("flex flex-col p-0 sm:p-0", CHAT_HEIGHT, className)}>
-      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <BotMark className="size-9" />
-        <div className="min-w-0 flex-1">
-          <h2 className="font-semibold">Ask the assistant</h2>
-          <p className="text-xs text-muted-foreground">AI can make mistakes, and it can't change your account.</p>
+      <div className="border-b border-border px-4 py-3">
+        <div className="flex items-center gap-3">
+          <BotMark className="size-9" />
+          <h2 className="min-w-0 flex-1 font-semibold">Ask the assistant</h2>
+          {messages.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 px-2.5"
+              onClick={newChat}
+              disabled={pending}
+              title="New chat"
+            >
+              <SquarePen className="size-4" aria-hidden />
+              {/* Icon only on phones, where the header is tight. */}
+              <span className="sr-only sm:not-sr-only">New chat</span>
+            </Button>
+          )}
         </div>
-        {messages.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="shrink-0 px-2.5"
-            onClick={newChat}
-            disabled={pending}
-            title="New chat"
-          >
-            <SquarePen className="size-4" aria-hidden />
-            {/* Icon only on phones, where the header is tight. */}
-            <span className="sr-only sm:not-sr-only">New chat</span>
-          </Button>
-        )}
+        <p className="mt-2 text-xs text-muted-foreground">
+          NVIDIA's AI answers using your question and a summary of your account and active orders. It can make
+          mistakes and can't change anything.{" "}
+          <Link to="/terms" className="font-medium text-primary hover:underline">
+            Terms
+          </Link>
+        </p>
       </div>
 
       <div
         ref={log}
         role="log"
         aria-label="Conversation with the assistant"
-        className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4"
+        tabIndex={-1}
+        className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 focus-visible:ring-inset focus-visible:ring-offset-0"
       >
         {messages.length === 0 ? (
           <div className="flex min-h-full flex-col justify-center gap-5 py-2">
@@ -271,7 +223,7 @@ function Chat({ className }: { className?: string }) {
                     <button
                       type="button"
                       onClick={() => send(q)}
-                      className="rounded-full border border-control bg-card px-3.5 py-1.5 text-left text-sm text-foreground transition-colors hover:border-primary/60 hover:bg-primary-soft hover:text-primary-soft-foreground"
+                      className="rounded-full border border-control bg-card px-3.5 py-1.5 text-left text-sm text-foreground transition-[color,background-color,border-color,transform] duration-150 ease-smooth hover:border-primary/60 hover:bg-primary-soft hover:text-primary-soft-foreground active:scale-[0.97] active:border-primary/60 active:bg-primary-soft active:text-primary-soft-foreground"
                     >
                       {q}
                     </button>

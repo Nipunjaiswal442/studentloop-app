@@ -236,7 +236,7 @@ Navigation: on phones there is a tab bar at the bottom (Shop, Orders, Deliver, W
 - Account: shows whether your email is verified. If it isn't, open the link we emailed you (check spam), then tap I've verified; Resend email sends a new link. Change password emails you a reset link (only for email and password accounts).
 - Appearance: switch between light and dark mode (also in the sidebar on a computer). Until you choose, it follows your device.
 - Links to Your orders, Help and Terms and conditions, and Sign out.
-- Install on your home screen: StudentLoop runs in the browser. On iPhone, open it in Safari, tap Share, then Add to Home Screen. On Android, open the Chrome menu and tap Install app or Add to Home screen.
+- Install on your home screen: StudentLoop runs in the browser, and the Get the app card on Profile shows the steps for your device. On iPhone, in Safari tap Share (if you don't see it, tap ••• first), scroll down, tap Add to Home Screen, then Add. On Android, tap Install app on that card when it appears, or open Chrome's menu and tap Install app or Add to Home screen.
 
 ## Help
 - The Help page has this assistant and a list of common questions. The assistant can explain things but can't change anything in your account. For anything it can't solve, email ${SUPPORT_EMAIL}.

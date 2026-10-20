@@ -1,6 +1,6 @@
 // Vercel's build command (see vercel.json). Checks the settings, tells Convex
-// which Firebase project to trust (and the help assistant's NVIDIA key, if
-// there is one), then deploys the backend and builds the site against it.
+// which Firebase project to trust (and the help assistant's NVIDIA settings,
+// if there are any), then deploys the backend and builds the site against it.
 // Everything it needs comes from Vercel's environment variables.
 import { execFileSync } from "node:child_process";
 
@@ -42,7 +42,9 @@ const convex = (...args) => execFileSync("npx", ["convex", ...args], { stdio: "i
 /**
  * Copies an optional assistant setting to Convex. The value goes in on stdin,
  * so it never appears in the build log or the process list. The assistant is
- * optional, so a failure here warns instead of stopping the deploy.
+ * optional, so a failure here warns instead of stopping the deploy. A setting
+ * missing from Vercel is left alone on Convex, since it may have been set
+ * there directly: switching the assistant off means deleting it in Convex.
  */
 function copyOptional(name) {
   const value = env[name]?.trim();
@@ -73,5 +75,6 @@ if (env.CONVEX_DEPLOY_KEY.startsWith("preview:")) {
   convex("env", "set", "FIREBASE_PROJECT_ID", env.VITE_FIREBASE_PROJECT_ID.trim());
   copyOptional("NVIDIA_API_KEY");
   copyOptional("NVIDIA_MODEL");
+  copyOptional("NVIDIA_BASE_URL");
 }
 convex("deploy", "--cmd", "npm run build");

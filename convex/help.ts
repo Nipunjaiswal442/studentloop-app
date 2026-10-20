@@ -164,7 +164,7 @@ export const ask = action({
       ctx.runQuery(internal.help.accountSummary, {}),
       listModels(base, apiKey),
     ]);
-    const summary = formatAccountSummary(account);
+    const messages = buildMessages({ summary: formatAccountSummary(account), history: args.history, message });
     const now = Date.now();
     const skip = new Set<string>();
     for (const [key, until] of missingUntil) {
@@ -183,9 +183,7 @@ export const ask = action({
             "Content-Type": "application/json",
             Accept: "application/json",
           },
-          body: JSON.stringify(
-            requestBody(model, buildMessages({ summary, history: args.history, message, model })),
-          ),
+          body: JSON.stringify(requestBody(model, messages)),
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
       } catch (e) {

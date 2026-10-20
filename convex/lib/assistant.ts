@@ -9,11 +9,12 @@ export const DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1";
  * Models to try, best first. These ids could not be checked against NVIDIA's
  * catalogue when this was written; the model listing (GET /models) and the
  * fallbacks in modelOrder() cope with any that don't exist. NVIDIA_MODEL
- * overrides the list.
+ * overrides the list. Llama 3.3 leads because it answers straight away; Qwen
+ * 3.5 reasons first unless told not to (see requestBody).
  */
 export const PREFERRED_MODELS = [
-  "qwen/qwen3.5-122b-a10b",
   "meta/llama-3.3-70b-instruct",
+  "qwen/qwen3.5-122b-a10b",
   "qwen/qwen2.5-72b-instruct",
   "meta/llama-3.1-70b-instruct",
   "meta/llama-3.1-8b-instruct",
@@ -160,10 +161,16 @@ export function cleanReply(content: unknown): string {
   return text.trim();
 }
 
-/** The cleaned reply from a chat completion body; reasoning_content is ignored. */
+/**
+ * The cleaned reply from a chat completion body; reasoning_content is ignored.
+ * A reply cut off by max_tokens ends in "…" so it doesn't read as complete.
+ */
 export function extractReply(body: unknown): string {
-  const choices = (body as { choices?: { message?: { content?: unknown } }[] } | null)?.choices;
-  return cleanReply(Array.isArray(choices) ? choices[0]?.message?.content : undefined);
+  type Choice = { message?: { content?: unknown }; finish_reason?: unknown };
+  const choices = (body as { choices?: Choice[] } | null)?.choices;
+  const choice = Array.isArray(choices) ? choices[0] : undefined;
+  const text = cleanReply(choice?.message?.content);
+  return text && choice?.finish_reason === "length" ? `${text}…` : text;
 }
 
 /* ───────────── Requests ───────────── */
@@ -252,12 +259,10 @@ export function buildMessages({
   summary,
   history,
   message,
-  model = "",
 }: {
   summary: string;
   history: Turn[];
   message: string;
-  model?: string;
 }): ChatMessage[] {
   const turns: ChatMessage[] = [];
   const recent = history.slice(-MAX_HISTORY_TURNS).map((t) => ({ role: t.role, content: t.text.trim().slice(0, MAX_TURN_CHARS) }));
@@ -266,12 +271,22 @@ export function buildMessages({
     if (turns[turns.length - 1]?.role === t.role) turns.pop();
     turns.push(t);
   }
-  // Qwen 3 models think out loud unless told not to; the switch is ignored elsewhere.
-  const noThink = /qwen3/i.test(model) ? "\n\n/no_think" : "";
-  return [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${summary}${noThink}` }, ...turns];
+  return [{ role: "system", content: `${SYSTEM_PROMPT}\n\n${summary}` }, ...turns];
 }
 
-/** The OpenAI-compatible /chat/completions body. */
+/**
+ * The OpenAI-compatible /chat/completions body. Qwen 3 and 3.5 reason before
+ * answering unless their chat template is told not to, which would spend the
+ * token budget and the timeout on thinking. Qwen 3.5 ignores "/no_think" in
+ * the prompt, so this is the switch.
+ */
 export function requestBody(model: string, messages: ChatMessage[]) {
-  return { model, messages, temperature: 0.3, max_tokens: 700, stream: false };
+  return {
+    model,
+    messages,
+    temperature: 0.3,
+    max_tokens: 700,
+    stream: false,
+    ...(/qwen3/i.test(model) && { chat_template_kwargs: { enable_thinking: false } }),
+  };
 }
