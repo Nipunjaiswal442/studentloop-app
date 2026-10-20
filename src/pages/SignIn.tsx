@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { useConvexAuth } from "convex/react";
 import { Eye, EyeOff, MailCheck, PackageCheck, ShieldCheck, Wallet } from "lucide-react";
@@ -14,6 +14,7 @@ import {
   signUpWithEmail,
   useAuthUser,
 } from "@/lib/auth";
+import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
 const PERKS = [
@@ -36,15 +37,6 @@ function GoogleMark() {
   );
 }
 
-function subscribeOnline(onChange: () => void) {
-  window.addEventListener("online", onChange);
-  window.addEventListener("offline", onChange);
-  return () => {
-    window.removeEventListener("online", onChange);
-    window.removeEventListener("offline", onChange);
-  };
-}
-
 /**
  * True when Firebase has signed someone in but the StudentLoop server keeps
  * refusing the session for a few seconds: almost always a settings mismatch.
@@ -52,7 +44,7 @@ function subscribeOnline(onChange: () => void) {
  */
 function useSessionRefused() {
   const user = useAuthUser();
-  const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine);
+  const online = useOnline();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const stuck = Boolean(user) && online && !isLoading && !isAuthenticated;
   const [refused, setRefused] = useState(false);

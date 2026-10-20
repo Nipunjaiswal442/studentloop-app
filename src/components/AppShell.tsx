@@ -84,14 +84,14 @@ export function AppShell() {
           <div className="mt-3 flex gap-2">
             <button
               onClick={toggle}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-1.5 text-xs font-medium text-muted-foreground transition-[color,transform] duration-150 hover:text-foreground active:scale-[0.97]"
             >
               {theme === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
               {theme === "dark" ? "Light" : "Dark"}
             </button>
             <button
               onClick={() => void signOut()}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-1.5 text-xs font-medium text-muted-foreground transition-[color,transform] duration-150 hover:text-foreground active:scale-[0.97]"
             >
               <LogOut className="size-3.5" />
               Sign out

@@ -35,7 +35,7 @@ export default function Shops() {
         title={me.firstName ? `Hi, ${me.firstName}` : "Shops"}
         subtitle="What do you need from campus today?"
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <LinkButton to="/post" variant="secondary" size="sm">
               <PackagePlus className="size-4" aria-hidden />
               Post an errand

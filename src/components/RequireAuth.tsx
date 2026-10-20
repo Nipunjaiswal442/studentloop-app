@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -10,29 +10,34 @@ import { signOut, takeSignUpName } from "@/lib/auth";
 import { errorMessage } from "@/lib/errors";
 import { TERMS } from "../../convex/lib/knowledge";
 import { MeContext } from "@/lib/me";
+import { useOnline } from "@/lib/online";
 import { useSubmit } from "@/lib/submit";
-
-function subscribeOnline(onChange: () => void) {
-  window.addEventListener("online", onChange);
-  window.addEventListener("offline", onChange);
-  return () => {
-    window.removeEventListener("online", onChange);
-    window.removeEventListener("offline", onChange);
-  };
-}
 
 function Splash() {
   // Opened offline (e.g. from the home screen), the session can't be confirmed
   // until the connection is back, so say so instead of spinning silently.
-  const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine);
+  const online = useOnline();
+  // Sign-in waits for the network rather than failing, so a connection that
+  // looks online but goes nowhere would otherwise spin with no explanation.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), 20_000);
+    return () => clearTimeout(timer);
+  }, []);
   return (
     <div className="grid min-h-dvh place-items-center px-6 pt-safe text-center" role="status">
       <div className="flex flex-col items-center gap-3">
         <Spinner className="size-7" />
-        {!online && (
+        {!online ? (
           <p className="max-w-xs text-sm text-muted-foreground">
             You're offline. StudentLoop will carry on as soon as you're connected again.
           </p>
+        ) : (
+          slow && (
+            <p className="max-w-xs text-sm text-muted-foreground">
+              Still connecting… If this keeps going, check your Wi-Fi or mobile data.
+            </p>
+          )
         )}
       </div>
     </div>
@@ -133,7 +138,7 @@ function TermsGate() {
           I have read and agree to the Terms and Conditions.
         </label>
 
-        <div className="mt-5 flex gap-3">
+        <div className="mt-5 flex flex-wrap gap-3">
           <Button size="lg" className="flex-1" disabled={!agreed} loading={pending} onClick={() => void run(() => accept())}>
             Accept and continue
           </Button>
