@@ -8,14 +8,38 @@ import { Prose } from "@/components/Prose";
 import { Button, Spinner } from "@/components/ui";
 import { signOut, takeSignUpName } from "@/lib/auth";
 import { errorMessage } from "@/lib/errors";
-import { TERMS } from "@/lib/legal";
+import { TERMS } from "../../convex/lib/knowledge";
 import { MeContext } from "@/lib/me";
+import { useOnline } from "@/lib/online";
 import { useSubmit } from "@/lib/submit";
 
 function Splash() {
+  // Opened offline (e.g. from the home screen), the session can't be confirmed
+  // until the connection is back, so say so instead of spinning silently.
+  const online = useOnline();
+  // Sign-in waits for the network rather than failing, so a connection that
+  // looks online but goes nowhere would otherwise spin with no explanation.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), 20_000);
+    return () => clearTimeout(timer);
+  }, []);
   return (
-    <div className="grid min-h-dvh place-items-center" role="status">
-      <Spinner className="size-7" />
+    <div className="grid min-h-dvh place-items-center px-6 pt-safe text-center" role="status">
+      <div className="flex flex-col items-center gap-3">
+        <Spinner className="size-7" />
+        {!online ? (
+          <p className="max-w-xs text-sm text-muted-foreground">
+            You're offline. StudentLoop will carry on as soon as you're connected again.
+          </p>
+        ) : (
+          slow && (
+            <p className="max-w-xs text-sm text-muted-foreground">
+              Still connecting… If this keeps going, check your Wi-Fi or mobile data.
+            </p>
+          )
+        )}
+      </div>
     </div>
   );
 }
@@ -61,7 +85,7 @@ function AccountGate() {
   }
   if (!failure) return <Splash />;
   return (
-    <div className="grid min-h-dvh place-items-center px-6 text-center">
+    <div className="grid min-h-dvh place-items-center px-6 pt-safe text-center">
       <div className="max-w-sm">
         <h1 className="text-xl font-semibold">We couldn't load your account</h1>
         <p className="mt-2 text-sm text-muted-foreground">{failure}</p>
@@ -89,37 +113,39 @@ function TermsGate() {
   const [agreed, setAgreed] = useState(false);
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 py-8 sm:py-14">
-      <Logo to="/" />
-      <h1 className="mt-8 text-2xl font-semibold tracking-tight">One last step</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Please read and accept the terms to start using StudentLoop.</p>
+    <div className="flex min-h-dvh flex-col pt-safe">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-8 sm:py-14">
+        <Logo to="/" />
+        <h1 className="mt-8 text-2xl font-semibold tracking-tight">One last step</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Please read and accept the terms to start using StudentLoop.</p>
 
-      <div
-        tabIndex={0}
-        role="region"
-        aria-label="Terms and conditions"
-        className="mt-5 min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-card p-5 shadow-card sm:max-h-[28rem] sm:flex-none"
-      >
-        <Prose text={TERMS} />
-      </div>
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Terms and conditions"
+          className="mt-5 min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-card p-5 shadow-card sm:max-h-[28rem] sm:flex-none"
+        >
+          <Prose text={TERMS} />
+        </div>
 
-      <label className="mt-5 flex cursor-pointer items-start gap-3 text-sm">
-        <input
-          type="checkbox"
-          checked={agreed}
-          onChange={(e) => setAgreed(e.target.checked)}
-          className="mt-0.5 size-4 accent-[hsl(var(--primary))]"
-        />
-        I have read and agree to the Terms and Conditions.
-      </label>
+        <label className="mt-5 flex cursor-pointer items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="mt-0.5 size-4 accent-[hsl(var(--primary))]"
+          />
+          I have read and agree to the Terms and Conditions.
+        </label>
 
-      <div className="mt-5 flex gap-3">
-        <Button size="lg" className="flex-1" disabled={!agreed} loading={pending} onClick={() => void run(() => accept())}>
-          Accept and continue
-        </Button>
-        <Button size="lg" variant="ghost" onClick={() => void signOut()}>
-          Sign out
-        </Button>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button size="lg" className="flex-1" disabled={!agreed} loading={pending} onClick={() => void run(() => accept())}>
+            Accept and continue
+          </Button>
+          <Button size="lg" variant="ghost" onClick={() => void signOut()}>
+            Sign out
+          </Button>
+        </div>
       </div>
     </div>
   );

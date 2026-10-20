@@ -3,8 +3,9 @@ import { cn } from "@/lib/utils";
 export type Variant = "primary" | "secondary" | "ghost" | "danger";
 export type Size = "sm" | "md" | "lg";
 
+// Presses shrink the button a touch so taps feel physical on phones.
 const buttonBase =
-  "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-[color,background-color,border-color,transform] duration-150 ease-smooth active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 disabled:active:scale-100";
 const variants: Record<Variant, string> = {
   primary: "bg-primary text-primary-foreground hover:bg-primary-hover",
   secondary: "border border-border bg-card text-foreground hover:bg-subtle",

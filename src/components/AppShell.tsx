@@ -57,7 +57,7 @@ export function AppShell() {
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-card p-4 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-card p-4 pt-[calc(1rem+env(safe-area-inset-top))] lg:flex">
         <Logo to="/shops" className="px-2 py-2" />
 
         <nav aria-label="Main" className="mt-6 flex flex-1 flex-col gap-1">
@@ -84,14 +84,14 @@ export function AppShell() {
           <div className="mt-3 flex gap-2">
             <button
               onClick={toggle}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-1.5 text-xs font-medium text-muted-foreground transition-[color,transform] duration-150 hover:text-foreground active:scale-[0.97]"
             >
               {theme === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
               {theme === "dark" ? "Light" : "Dark"}
             </button>
             <button
               onClick={() => void signOut()}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border bg-card py-1.5 text-xs font-medium text-muted-foreground transition-[color,transform] duration-150 hover:text-foreground active:scale-[0.97]"
             >
               <LogOut className="size-3.5" />
               Sign out
@@ -102,19 +102,26 @@ export function AppShell() {
 
       <div className="flex min-h-dvh min-w-0 flex-col">
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur lg:hidden">
-          <Logo to="/shops" />
+        <header className="sticky top-0 z-30 box-content flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 pt-safe backdrop-blur lg:hidden">
+          <Logo to="/shops" compact />
           <div className="flex items-center gap-1">
             <NavLink
               to="/wallet"
-              className="tabular rounded-full bg-primary-soft px-3 py-1.5 text-sm font-semibold text-primary-soft-foreground"
+              className="tabular rounded-full bg-primary-soft px-3 py-1.5 text-sm font-semibold text-primary-soft-foreground transition-transform duration-150 ease-smooth active:scale-[0.96]"
             >
               {money(me.walletBalance)}
             </NavLink>
             <NavLink
+              to="/help"
+              aria-label="Help"
+              className="grid size-10 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-subtle active:bg-subtle"
+            >
+              <LifeBuoy className="size-5" />
+            </NavLink>
+            <NavLink
               to="/cart"
               aria-label={`Cart, ${cart.count} items`}
-              className="relative grid size-10 place-items-center rounded-full text-muted-foreground hover:bg-subtle"
+              className="relative grid size-10 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-subtle active:bg-subtle"
             >
               <ShoppingCart className="size-5" />
               {cart.count > 0 && (
@@ -127,11 +134,16 @@ export function AppShell() {
         </header>
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-28 sm:px-6 lg:px-10 lg:py-10 lg:pb-10">
-          <ErrorBoundary key={location.pathname}>
-            <Suspense fallback={<Spinner className="mx-auto mt-24 size-7" />}>
-              <Outlet />
-            </Suspense>
-          </ErrorBoundary>
+          {/* Keyed by path: each page gets a fresh error boundary and a short enter
+              animation. It fills "backwards" so no transform is left behind to
+              trap the page's fixed bars once it has played. */}
+          <div key={location.pathname} className="motion-safe:animate-fade">
+            <ErrorBoundary>
+              <Suspense fallback={<Spinner className="mx-auto mt-24 size-7" />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
         </main>
       </div>
 
@@ -146,20 +158,37 @@ export function AppShell() {
             to={item.to}
             className={({ isActive: on }) =>
               cn(
-                "relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
+                "group relative flex flex-col items-center gap-0.5 pb-2 pt-1.5 text-[11px] font-medium",
                 on ? "text-primary" : "text-muted-foreground",
               )
             }
           >
-            <span className="relative">
-              <item.icon className="size-5" aria-hidden />
-              {item.badge ? (
-                <span className="absolute -right-2 -top-1.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
-                  {item.badge}
+            {({ isActive: on }) => (
+              <>
+                <span className="relative grid h-7 w-14 place-items-center transition-transform duration-150 ease-smooth group-active:scale-90">
+                  {/* Pill behind the active icon; every tab has one so it can grow in and fade out. */}
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "absolute inset-0 rounded-full bg-primary-soft transition-[opacity,transform] duration-300 ease-spring",
+                      on ? "scale-100 opacity-100" : "scale-x-50 opacity-0",
+                    )}
+                  />
+                  <span className="relative">
+                    <item.icon
+                      className={cn("size-5", on && "text-primary-soft-foreground motion-safe:animate-pop")}
+                      aria-hidden
+                    />
+                    {item.badge ? (
+                      <span className="absolute -right-2 -top-1.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
+                        {item.badge}
+                      </span>
+                    ) : null}
+                  </span>
                 </span>
-              ) : null}
-            </span>
-            {item.label}
+                {item.label}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
@@ -176,7 +205,7 @@ function SideLink({ item }: { item: NavItem }) {
           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
           on
             ? "bg-primary-soft text-primary-soft-foreground"
-            : "text-muted-foreground hover:bg-subtle hover:text-foreground",
+            : "text-muted-foreground hover:bg-subtle hover:text-foreground active:bg-subtle",
         )
       }
     >

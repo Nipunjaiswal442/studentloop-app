@@ -128,10 +128,10 @@ export default function Shop() {
 
       {/* Mobile: cart bar above the tab bar */}
       {mine && cart.count > 0 && (
-        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 px-4 lg:hidden">
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 pl-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] lg:hidden">
           <Link
             to="/cart"
-            className="flex h-12 items-center justify-between rounded-xl bg-primary px-4 font-medium text-primary-foreground shadow-raised"
+            className="flex h-12 items-center justify-between rounded-xl bg-primary px-4 font-medium text-primary-foreground shadow-raised transition-transform duration-150 ease-smooth active:scale-[0.98]"
           >
             <span className="inline-flex items-center gap-2">
               <ShoppingCart className="size-4" aria-hidden />

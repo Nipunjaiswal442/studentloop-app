@@ -26,7 +26,7 @@ export function RequestCard({
   return (
     <Link
       to={to}
-      className="group flex gap-3 rounded-xl border border-border bg-card p-4 shadow-card transition-colors hover:border-primary/50"
+      className="group flex gap-3 rounded-xl border border-border bg-card p-4 shadow-card transition-[border-color,box-shadow,transform] duration-200 ease-smooth hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-raised active:scale-[0.99]"
     >
       <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary-soft-foreground">
         <Icon className="size-5" aria-hidden />

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Spinner } from "@/components/ui";
 import { CartProvider } from "@/lib/cart";
@@ -33,31 +34,37 @@ export default function App() {
           </div>
         }
       >
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/terms" element={<Terms />} />
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/terms" element={<Terms />} />
 
-          <Route element={<RequireAuth />}>
-            <Route path="/shops" element={<Shops />} />
-            <Route path="/shops/new" element={<AddShop />} />
-            <Route path="/shops/:shopId" element={<Shop />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/orders/:id" element={<RequestPage />} />
-            <Route path="/deliver" element={<Deliver />} />
-            <Route path="/deliver/:id" element={<RequestPage />} />
-            <Route path="/post" element={<Post />} />
-            <Route path="/wallet" element={<WalletPage />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/help" element={<Help />} />
-          </Route>
+            <Route element={<RequireAuth />}>
+              <Route path="/shops" element={<Shops />} />
+              <Route path="/shops/new" element={<AddShop />} />
+              <Route path="/shops/:shopId" element={<Shop />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/orders/:id" element={<RequestPage />} />
+              <Route path="/deliver" element={<Deliver />} />
+              <Route path="/deliver/:id" element={<RequestPage />} />
+              <Route path="/post" element={<Post />} />
+              <Route path="/wallet" element={<WalletPage />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/help" element={<Help />} />
+            </Route>
 
-          <Route path="/home" element={<Navigate to="/shops" replace />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            <Route path="/home" element={<Navigate to="/shops" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </ErrorBoundary>
       </Suspense>
-      <Toaster position="top-center" theme={theme} mobileOffset={{ top: 64 }} />
+      {/* With the black-translucent status bar of the home-screen app, iOS draws
+          white text over the page; this strip keeps it readable. It has no
+          height anywhere else. */}
+      <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-primary dark:bg-background" />
+      <Toaster position="top-center" theme={theme} mobileOffset={{ top: "calc(64px + env(safe-area-inset-top))" }} />
     </CartProvider>
   );
 }

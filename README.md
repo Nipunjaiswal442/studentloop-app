@@ -12,8 +12,21 @@ A campus delivery network. Students order from campus shops, post errands, or ea
 - **Wallet**: top-ups, escrow for every order, refunds, earnings and a full ledger.
 - **Live everywhere**: order status, carrier assignment, balances and badges update the moment something changes, with no refreshing.
 - **Trust**: ratings feed a trust score; issues can be reported with a photo; carriers only see a requester's room after accepting.
-- **Help desk**: an FAQ plus an AI assistant.
-- Responsive from phones (bottom tab bar) to desktop (sidebar), light and dark.
+- **Help desk**: an FAQ plus an AI assistant that knows the app and your current orders.
+- **Works like an app**: add it to your phone's home screen; it opens full screen and starts offline.
+- Responsive from phones (bottom tab bar) to desktop (sidebar), emerald light and dark themes, with motion that respects *Reduce motion*.
+
+## Install on your phone
+
+StudentLoop can live on your home screen like an app: its own icon, full screen, and it opens even without a connection (your data loads once you're back online).
+
+- **iPhone or iPad:** open the site in Safari, tap **Share** (if you don't see it, tap **•••** first), then **Add to Home Screen**, then **Add**.
+- **Android:** in Chrome, open the **⋮** menu and choose **Install app** or **Add to Home screen**. When Chrome offers it, the Profile page also has an **Install app** button.
+- **Computer:** in Chrome or Edge, click the install icon in the address bar. In Safari on a Mac, choose **File > Add to Dock**.
+
+On iPhone the home-screen app keeps its own sign-in, separate from Safari, so you sign in once more inside it. Use your email and password there: Google sign-in doesn't always finish inside the installed app (see Known limitations).
+
+The Profile page shows the right steps for the device you're on. Under the hood: `public/manifest.webmanifest`, the icons in `public/icons/`, and a small service worker (`public/sw.js`) that keeps the app shell and build files for offline starts. If you change what `sw.js` caches, bump its `VERSION`. `vercel.json` keeps `/assets` and `/icons` out of the page fallback, so a build file that's gone after a deploy is a real 404, never the app page; an app left open since an older version reloads itself when it can't find one.
 
 ## Stack
 
@@ -22,7 +35,7 @@ A campus delivery network. Students order from campus shops, post errands, or ea
 | Frontend | React 19, TypeScript, Vite 7, React Router 7, Tailwind CSS 3 |
 | Backend | [Convex](https://convex.dev): database, server functions, file storage, scheduler, realtime |
 | Auth | [Firebase Authentication](https://firebase.google.com/docs/auth): email and password, Google, password reset, email verification. Convex checks every Firebase ID token itself |
-| AI help | NVIDIA NIM (Qwen, with a Llama fallback), called from a Convex action |
+| AI help | NVIDIA NIM (Llama 3.3, with Qwen and other fallbacks), called from a Convex action |
 | Hosting | Vercel (frontend) and Convex Cloud (backend) |
 | Tests | Vitest and `convex-test` |
 
@@ -57,12 +70,14 @@ convex/                  Backend (TypeScript)
   deliveries.ts          The job lifecycle: post, accept, purchase, deliver, cancel, rate
   orders.ts              Shop checkout (server-side pricing, escrow)
   wallet.ts, shops.ts, users.ts, disputes.ts, files.ts, help.ts, seed.ts
-  lib/                   Ledger, validation, uploads, shared constants
+  lib/                   Ledger, validation, uploads, shared constants,
+                         knowledge.ts (FAQ, terms, the assistant's guide), assistant.ts
 src/
   pages/                 One file per screen
   components/            App shell, request card, stepper, UI primitives
-  lib/                   Firebase sign-in, cart, theme, formatting, domain labels, FAQ and terms text
-tests/                   Backend tests
+  lib/                   Firebase sign-in, cart, theme, formatting, domain labels
+public/                  Icons, web app manifest and service worker (home-screen app)
+tests/                   Backend, assistant and colour-contrast tests
 scripts/deploy.mjs       Vercel build: checks settings, deploys Convex, builds the site
 ```
 
@@ -104,7 +119,7 @@ Keep `npx convex dev` running while you work; it redeploys the backend on every 
 | `VITE_FIREBASE_APP_ID` | Vercel (and `.env.local`) | No | Also from the Firebase web config |
 | `CONVEX_DEPLOY_KEY` | Vercel | Yes | Lets the build deploy the backend. Use a **production** key |
 | `FIREBASE_PROJECT_ID` | Convex | Yes | Which Firebase project's tokens to accept. The Vercel build copies it from `VITE_FIREBASE_PROJECT_ID`; set it yourself only for local work |
-| `NVIDIA_API_KEY` | Convex | No | Turns on the AI assistant. Without it the FAQ still works |
+| `NVIDIA_API_KEY` | Vercel (the build copies it to Convex) or Convex | No | Turns on the help assistant (see [Help assistant](#help-assistant)). Without it the FAQ still works. To switch it off, delete it in Convex. Never name it `VITE_NVIDIA_API_KEY` |
 
 `VITE_CONVEX_URL` is filled in automatically: by `npx convex dev` locally and by `convex deploy` on Vercel. You don't need to set it.
 
@@ -117,11 +132,22 @@ Keep `npx convex dev` running while you work; it redeploys the backend on every 
 2. **Convex**: in the dashboard, open the project, *Settings > Deploy keys*, create a **production** deploy key.
 3. **Vercel** (*Settings > Environment Variables*, Production): add `CONVEX_DEPLOY_KEY` and the three or four `VITE_FIREBASE_*` values, then redeploy. The build (`scripts/deploy.mjs`) stops with a list of anything missing; otherwise it copies the Firebase project id to Convex, deploys the backend and builds the site against it.
 4. **Shops**: if the shop list is empty, open the Convex dashboard, *Functions > seed:run > Run* (or `npx convex run --prod seed:run`). It does nothing when shops exist.
-5. Optional: set `NVIDIA_API_KEY` on the production deployment (Convex dashboard, *Settings > Environment Variables*).
+5. Optional, the help assistant: add `NVIDIA_API_KEY` in Vercel (Production) and redeploy, or set it on the Convex deployment. See [Help assistant](#help-assistant).
 
 **Preview deployments** need their own Convex *preview* deploy key as `CONVEX_DEPLOY_KEY` in Vercel's Preview environment (never the production key there), plus `FIREBASE_PROJECT_ID` under the Convex project's default environment variables for previews. Without a key, preview builds stop with a message saying so; production is unaffected.
 
 **Leftovers from the previous sign-in system**, safe to delete in the Convex dashboard once you're happy: the environment variables `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and the tables `authAccounts`, `authSessions`, `authRefreshTokens`, `authVerificationCodes`, `authVerifiers`, `authRateLimits` (they hold old password hashes and nothing reads them).
+
+### Help assistant
+
+The chat on the Help page runs on [NVIDIA NIM](https://build.nvidia.com). To switch it on, create an API key at build.nvidia.com and add it in Vercel as `NVIDIA_API_KEY` (Production), then redeploy: the build copies it to Convex. Setting it directly on the Convex deployment works too. That's all; until then the Help page shows only the FAQ.
+
+- The assistant asks NVIDIA which models the key can use and picks the first available of Llama 3.3 70B, Qwen 3.5 122B (with its thinking step switched off), Qwen 2.5 72B, Llama 3.1 70B and 8B, falling back to the next if one fails. Set `NVIDIA_MODEL` to choose one yourself, or `NVIDIA_BASE_URL` for another OpenAI-compatible endpoint; the build copies both from Vercel, like the key.
+- To switch it off, delete `NVIDIA_API_KEY` in the Convex dashboard (*Settings > Environment Variables*). Removing it from Vercel isn't enough: the build copies these settings to Convex but never deletes them there. The same goes for `NVIDIA_MODEL` and `NVIDIA_BASE_URL`.
+- Never use the name `VITE_NVIDIA_API_KEY`: anything starting with `VITE_` is published inside the site, so the build stops if it sees one.
+- Each person can ask 8 questions a minute and 60 a day. Along with the question, NVIDIA gets a short summary of the asker's own account: first name, balance, bonus coins, their active orders and errands, and the deliveries they're carrying. It never gets other people's names, rooms, phone numbers or delivery codes. The titles of jobs someone carries are included, but those are already public on the open-requests feed. The chat says this above the conversation, with a link to the terms.
+- If it replies that it's misconfigured, NVIDIA rejected the key; check `NVIDIA_API_KEY`. Failures are logged (without the key or messages) under *Logs* in the Convex dashboard.
+- What it knows about the app lives in `convex/lib/knowledge.ts`, next to the FAQ and terms. Update the guide there when screens or rules change.
 
 ### If sign-in doesn't work
 
@@ -154,6 +180,8 @@ Keep `npx convex dev` running while you work; it redeploys the backend on every 
 - **Reports are stored, not handled.** Disputes are saved with their photo; there is no admin screen to review them yet, and they do not move money.
 - **Uploads:** only images up to 5 MB are accepted when attached to an order or report, but an upload that is never attached is not cleaned up automatically.
 - The shop list is open to anyone signed in to add to, with no moderation.
+- **Google sign-in inside the installed iPhone app may not complete.** iOS opens Google in a separate sheet that Firebase can't watch, so if the sheet is closed, or the result doesn't make it back, the attempt never ends. A couple of seconds after the user is back in the app, the Google button is freed and a note suggests email and password (which work there) or Safari. The robust fix is Firebase's custom auth domain: proxy `/__/auth` through this site and point `VITE_FIREBASE_AUTH_DOMAIN` at it, which the site owner has to set up in Firebase and Vercel.
+- **The assistant's model ids** (Llama 3.3 70B first) couldn't be checked against NVIDIA's live catalogue when this was written. It asks NVIDIA which models exist and falls back automatically; set `NVIDIA_MODEL` if you want a specific one.
 
 ## License
 

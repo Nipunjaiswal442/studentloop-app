@@ -9,9 +9,14 @@ export {
   ISSUE_TYPES,
   MAX_ACTIVE_JOBS,
   MAX_REWARD,
+  MIN_REWARD,
+  TOPUP_DAILY_MAX,
+  TOPUP_MAX,
+  TOPUP_MIN,
   URGENCIES,
 } from "../../convex/lib/constants";
 export type { Category, Urgency } from "../../convex/lib/constants";
+export { STAGE_LABEL } from "../../convex/lib/knowledge";
 
 export type RequestView = NonNullable<FunctionReturnType<typeof api.deliveries.get>>;
 export type Stage = RequestView["status"];
@@ -32,14 +37,6 @@ export const STEPS: { stage: Stage; label: string; carrierLabel: string }[] = [
   { stage: "delivered", label: "Delivered", carrierLabel: "Delivered" },
 ];
 
-export const STAGE_LABEL: Record<Stage, string> = {
-  open: "Waiting for a carrier",
-  accepted: "Carrier assigned",
-  purchased: "Items bought",
-  out_for_delivery: "On the way",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
-};
 
 export const stepIndex = (stage: Stage) => STEPS.findIndex((s) => s.stage === stage);
 

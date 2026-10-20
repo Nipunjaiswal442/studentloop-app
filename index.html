@@ -3,9 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#047857" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b1412" media="(prefers-color-scheme: dark)" />
+    <!-- Home-screen app: full screen, drawn under the status bar (pages pad with .pt-safe). -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="StudentLoop" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta
       name="description"
       content="StudentLoop is a campus delivery network. Order from campus shops, post errands, or earn by delivering for other students."
@@ -31,6 +39,14 @@
           document.documentElement.classList.add('dark');
         }
       } catch (e) {}
+    </script>
+    <script>
+      // Chrome offers to install the app once per page load, usually before the
+      // Profile page (which has the Install button) has loaded. Keep the offer for it.
+      addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__installPrompt = e;
+      });
     </script>
   </head>
   <body>

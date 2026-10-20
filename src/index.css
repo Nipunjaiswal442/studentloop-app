@@ -54,11 +54,17 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    /* Taps get our own press feedback instead of the grey iOS/Android flash. */
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
     @apply bg-background font-sans text-foreground antialiased;
     font-feature-settings: 'cv11', 'ss01';
+    /* viewport-fit=cover lets a landscape iPhone's notch overlap the page's sides.
+       Both insets are 0 in portrait and on desktop. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   * {
@@ -101,6 +107,23 @@
   }
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ───────────── Motion ─────────────
+   Keyframes and easings live in tailwind.config.js (animate-*, ease-smooth,
+   ease-spring). Only transform and opacity move. Nothing is hidden unless the
+   device is fine with motion, so reduced motion (and print) always gets the
+   finished page. */
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* Scroll reveal. The landing page sets data-reveal on its root only when
+     IntersectionObserver exists, then marks each .reveal with data-in once it
+     has been on screen. Stagger with an inline animation-delay. */
+  [data-reveal] .reveal:not([data-in]) {
+    opacity: 0;
+  }
+  [data-reveal] .reveal[data-in] {
+    @apply animate-rise;
   }
 }
 

@@ -1,8 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { useConvexAuth } from "convex/react";
 import { Eye, EyeOff, MailCheck, PackageCheck, ShieldCheck, Wallet } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button, Field, Input, Spinner } from "@/components/ui";
 import {
   authErrorMessage,
@@ -13,6 +14,7 @@ import {
   signUpWithEmail,
   useAuthUser,
 } from "@/lib/auth";
+import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
 const PERKS = [
@@ -38,11 +40,13 @@ function GoogleMark() {
 /**
  * True when Firebase has signed someone in but the StudentLoop server keeps
  * refusing the session for a few seconds: almost always a settings mismatch.
+ * Never while offline, when the server can't have answered at all.
  */
 function useSessionRefused() {
   const user = useAuthUser();
+  const online = useOnline();
   const { isLoading, isAuthenticated } = useConvexAuth();
-  const stuck = Boolean(user) && !isLoading && !isAuthenticated;
+  const stuck = Boolean(user) && online && !isLoading && !isAuthenticated;
   const [refused, setRefused] = useState(false);
   useEffect(() => {
     if (!stuck) return;
@@ -52,12 +56,16 @@ function useSessionRefused() {
       setRefused(false);
     };
   }, [stuck]);
-  return { refused: stuck && refused, connecting: Boolean(user) && !isAuthenticated && !refused };
+  return {
+    refused: stuck && refused,
+    connecting: Boolean(user) && !isAuthenticated && !(stuck && refused),
+    offline: !online,
+  };
 }
 
 export default function SignIn() {
   const { isAuthenticated } = useConvexAuth();
-  const { refused, connecting } = useSessionRefused();
+  const { refused, connecting, offline } = useSessionRefused();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
 
@@ -70,12 +78,40 @@ export default function SignIn() {
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Google has its own state so a sign-in that never comes back can't lock the form.
+  const [googlePending, setGooglePending] = useState(false);
+  const [googleStalled, setGoogleStalled] = useState(false);
+  const googleAttempt = useRef(0);
+
+  // In the installed iPhone app, Firebase can't tell when the Google sheet is
+  // closed, so the attempt may never finish. Once the app is back on screen and
+  // nothing has happened for a moment, free the button and say what works. A
+  // late success still signs the user in.
+  useEffect(() => {
+    if (!googlePending || navigator.standalone !== true) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onVisibility = () => {
+      clearTimeout(timer);
+      if (document.visibilityState !== "visible") return;
+      timer = setTimeout(() => {
+        googleAttempt.current++;
+        setGooglePending(false);
+        setGoogleStalled(true);
+      }, 2000);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [googlePending]);
 
   if (isAuthenticated) return <Navigate to={from} replace />;
 
   const setMode = (next: Mode) => {
     setError("");
     setNotice("");
+    setGoogleStalled(false);
     const value = MODE_PARAM[next];
     setParams(value ? { mode: value } : {}, { replace: true, state: location.state });
   };
@@ -83,6 +119,7 @@ export default function SignIn() {
   async function attempt(action: () => Promise<void>) {
     setError("");
     setNotice("");
+    setGoogleStalled(false);
     setPending(true);
     try {
       await action();
@@ -90,6 +127,22 @@ export default function SignIn() {
       setError(authErrorMessage(e) ?? "");
     } finally {
       setPending(false);
+    }
+  }
+
+  async function continueWithGoogle() {
+    const id = ++googleAttempt.current;
+    setError("");
+    setNotice("");
+    setGoogleStalled(false);
+    setGooglePending(true);
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      const message = authErrorMessage(e);
+      if (message && id === googleAttempt.current) setError(message);
+    } finally {
+      if (id === googleAttempt.current) setGooglePending(false);
     }
   }
 
@@ -117,7 +170,7 @@ export default function SignIn() {
   }[mode];
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-2">
+    <div className="min-h-dvh pt-safe lg:grid lg:grid-cols-2 lg:pt-0">
       <aside className="hidden flex-col justify-between bg-subtle p-12 lg:flex">
         <Logo />
         <div className="max-w-md">
@@ -138,16 +191,20 @@ export default function SignIn() {
         <p className="text-sm text-muted-foreground">Built for campus life.</p>
       </aside>
 
-      <main className="flex flex-col justify-center px-5 py-10 sm:px-10">
+      <main className="relative flex flex-col justify-center px-5 py-10 sm:px-10">
+        <ThemeToggle className="absolute right-3 top-3 sm:right-6 sm:top-6" />
         <div className="mx-auto w-full max-w-sm">
           <Logo className="mb-10 lg:hidden" />
 
           {refused ? (
             <SessionRefused />
           ) : connecting ? (
-            <div role="status" className="flex flex-col items-center gap-3 py-16 text-sm text-muted-foreground">
+            <div role="status" className="flex flex-col items-center gap-3 py-16 text-center text-sm text-muted-foreground">
               <Spinner className="size-7" />
               Signing you in…
+              {offline && (
+                <p className="max-w-xs">You're offline. StudentLoop will carry on as soon as you're connected again.</p>
+              )}
             </div>
           ) : (
             <>
@@ -266,11 +323,18 @@ export default function SignIn() {
                     size="lg"
                     className="w-full"
                     disabled={pending}
-                    onClick={() => void attempt(signInWithGoogle)}
+                    loading={googlePending}
+                    onClick={() => void continueWithGoogle()}
                   >
-                    <GoogleMark />
+                    {!googlePending && <GoogleMark />}
                     Continue with Google
                   </Button>
+                  {googleStalled && (
+                    <p role="status" className="mt-3 rounded-lg bg-subtle px-3 py-2 text-sm text-muted-foreground">
+                      Google sign-in doesn't always finish inside the installed iPhone app. Sign in with your email and
+                      password instead, or open StudentLoop in Safari.
+                    </p>
+                  )}
                 </>
               )}
 

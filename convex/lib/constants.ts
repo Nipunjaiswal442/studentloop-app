@@ -30,6 +30,7 @@ export const TOPUP_MAX = 5000;
 export const TOPUP_DAILY_MAX = 10000;
 
 export const MAX_TIP = 200;
+export const MIN_REWARD = 10;
 export const MAX_REWARD = 500;
 export const MAX_LINE_QTY = 20;
 export const MAX_ACTIVE_JOBS = 3;

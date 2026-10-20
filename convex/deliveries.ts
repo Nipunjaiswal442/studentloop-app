@@ -11,6 +11,7 @@ import {
 import {
   MAX_ACTIVE_JOBS,
   MAX_REWARD,
+  MIN_REWARD,
   MAX_TIP,
   OTP_LOCK_MINUTES,
   OTP_MAX_ATTEMPTS,
@@ -237,7 +238,7 @@ export const post = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const title = text(args.title, "Description", 80);
-    const reward = wholeRupees(args.reward, "Reward", 10, MAX_REWARD);
+    const reward = wholeRupees(args.reward, "Reward", MIN_REWARD, MAX_REWARD);
     const tip = wholeRupees(args.tip, "Tip", 0, MAX_TIP);
     const deadlineMinutes = wholeRupees(args.deadlineMinutes, "Deadline", 10, 240);
     if (args.items.length > 15) fail("Please list at most 15 items.");
