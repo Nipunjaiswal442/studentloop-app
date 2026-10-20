@@ -2,7 +2,7 @@
   "framework": "vite",
   "buildCommand": "node scripts/deploy.mjs",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [{ "source": "/((?!assets/|icons/).*)", "destination": "/index.html" }],
   "headers": [
     {
       "source": "/sw.js",

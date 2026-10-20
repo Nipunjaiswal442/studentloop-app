@@ -24,7 +24,9 @@ StudentLoop can live on your home screen like an app: its own icon, full screen,
 - **Android:** in Chrome, open the **⋮** menu and choose **Install app** or **Add to Home screen**. When Chrome offers it, the Profile page also has an **Install app** button.
 - **Computer:** in Chrome or Edge, click the install icon in the address bar. In Safari on a Mac, choose **File > Add to Dock**.
 
-The Profile page shows the right steps for the device you're on. Under the hood: `public/manifest.webmanifest`, the icons in `public/icons/`, and a small service worker (`public/sw.js`) that keeps the app shell and build files for offline starts. If you change what `sw.js` caches, bump its `VERSION`.
+On iPhone the home-screen app keeps its own sign-in, separate from Safari, so you sign in once more inside it. Use your email and password there: Google sign-in doesn't always finish inside the installed app (see Known limitations).
+
+The Profile page shows the right steps for the device you're on. Under the hood: `public/manifest.webmanifest`, the icons in `public/icons/`, and a small service worker (`public/sw.js`) that keeps the app shell and build files for offline starts. If you change what `sw.js` caches, bump its `VERSION`. `vercel.json` keeps `/assets` and `/icons` out of the page fallback, so a build file that's gone after a deploy is a real 404, never the app page; an app left open since an older version reloads itself when it can't find one.
 
 ## Stack
 
@@ -178,6 +180,7 @@ The chat on the Help page runs on [NVIDIA NIM](https://build.nvidia.com). To swi
 - **Reports are stored, not handled.** Disputes are saved with their photo; there is no admin screen to review them yet, and they do not move money.
 - **Uploads:** only images up to 5 MB are accepted when attached to an order or report, but an upload that is never attached is not cleaned up automatically.
 - The shop list is open to anyone signed in to add to, with no moderation.
+- **Google sign-in inside the installed iPhone app may not complete.** iOS opens Google in a separate sheet that Firebase can't watch, so if the sheet is closed, or the result doesn't make it back, the attempt never ends. A couple of seconds after the user is back in the app, the Google button is freed and a note suggests email and password (which work there) or Safari. The robust fix is Firebase's custom auth domain: proxy `/__/auth` through this site and point `VITE_FIREBASE_AUTH_DOMAIN` at it, which the site owner has to set up in Firebase and Vercel.
 - **The assistant's model ids** (Llama 3.3 70B first) couldn't be checked against NVIDIA's live catalogue when this was written. It asks NVIDIA which models exist and falls back automatically; set `NVIDIA_MODEL` if you want a specific one.
 
 ## License

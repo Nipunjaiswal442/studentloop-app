@@ -10,7 +10,7 @@
 //   but GET is left alone.
 //
 // Bump VERSION when this file's caching changes; activate deletes old caches.
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `studentloop-shell-${VERSION}`;
 const STATIC_CACHE = `studentloop-static-${VERSION}`;
 const SHELL_URL = "/index.html";
@@ -77,16 +77,31 @@ async function cacheFirst(event, refresh) {
   const cache = await caches.open(STATIC_CACHE);
   const cached = await cache.match(event.request);
   if (cached && !refresh) return cached;
-  const update = fetch(event.request).then(async (response) => {
-    if (response.ok && response.type === "basic") {
-      await cache.put(event.request, response.clone());
-      await trim(cache);
-    }
-    return response;
-  });
+  const update = fetch(event.request)
+    // A file missing mid-deploy gets a 404 with the build files' year-long cache
+    // header, and the browser keeps it. If the file is back (a rollback), only
+    // a request past the browser's cache finds it.
+    .then((response) => (response.ok ? response : fetch(event.request, { cache: "reload" })))
+    .then(async (response) => {
+      if (isFile(response)) {
+        await cache.put(event.request, response.clone());
+        await trim(cache);
+      }
+      return response;
+    });
   if (!cached) return update;
   event.waitUntil(update.catch(() => {}));
   return cached;
+}
+
+// A host that answers a missing file with the app page (an SPA fallback) must
+// not get that page stored, and later served, in place of a script or icon.
+function isFile(response) {
+  return (
+    response.ok &&
+    response.type === "basic" &&
+    !(response.headers.get("content-type") ?? "").includes("text/html")
+  );
 }
 
 // Every route serves index.html; a redirect or a non-HTML file opened directly must not replace it.
@@ -114,7 +129,9 @@ async function keepShell(response) {
   const entry = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
   await Promise.all(
     entry.map(async (path) => {
-      if (!(await files.match(path))) await files.add(path).catch(() => {});
+      if (await files.match(path)) return;
+      const response = await fetch(path).catch(() => null);
+      if (response && isFile(response)) await files.put(path, response);
     }),
   );
   await trim(files);

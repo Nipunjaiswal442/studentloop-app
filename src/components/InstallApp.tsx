@@ -41,9 +41,11 @@ function detectPlatform(): Platform {
   const ua = navigator.userAgent;
   // iPadOS asks for desktop sites and says it's a Mac; touch gives it away.
   const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  // Other browsers add their own name, and in-app browsers leave out "Safari/".
+  // Only Safari itself says "Version/x … Safari/"; in-app browsers (Instagram,
+  // Snapchat's "like Safari/") leave out Version/, and other browsers add their own name.
   const safari =
-    /Safari\//.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|GSA\/|DuckDuckGo|YaBrowser|Chrome|Chromium|Edg\/|OPR\//.test(ua);
+    /Version\/[\d.]+.*Safari\//.test(ua) &&
+    !/CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|GSA\/|DuckDuckGo|YaBrowser|Chrome|Chromium|Edg\/|OPR\//.test(ua);
   if (ios) return safari ? "ios-safari" : "ios-other";
   return safari && /Macintosh/.test(ua) ? "mac-safari" : "other";
 }

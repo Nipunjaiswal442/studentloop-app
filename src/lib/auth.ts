@@ -78,18 +78,44 @@ export function useAuthUser(): AuthUser | null | undefined {
   return useSyncExternalStore(subscribe, () => current);
 }
 
+function errorCode(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+}
+
+/** Resolves when the device comes back online, the signed-in user changes, or after `ms`. */
+function nextTokenAttempt(ms: number) {
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      window.removeEventListener("online", done);
+      listeners.delete(done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    window.addEventListener("online", done);
+    listeners.add(done);
+  });
+}
+
 /** Adapter for <ConvexProviderWithAuth>: hands Convex a Firebase ID token whenever it asks. */
 export function useConvexAuthFromFirebase() {
   const user = useAuthUser();
   const uid = user?.uid;
   const fetchAccessToken = useCallback(
     async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-      const signedIn = auth?.currentUser;
-      if (!signedIn || signedIn.uid !== uid) return null;
-      try {
-        return await signedIn.getIdToken(forceRefreshToken);
-      } catch {
-        return null;
+      // An expired token can't be renewed without a connection. Answering null
+      // would tell Convex the user is signed out, so keep it waiting instead: the
+      // app shows its offline screen and carries on once Firebase is reachable.
+      // The timer matters too: iOS can claim to be online on a dead network.
+      for (let wait = 1000; ; wait = Math.min(wait * 2, 15_000)) {
+        const signedIn = auth?.currentUser;
+        if (!signedIn || signedIn.uid !== uid) return null;
+        try {
+          return await signedIn.getIdToken(forceRefreshToken);
+        } catch (e) {
+          if (errorCode(e) !== "auth/network-request-failed" && navigator.onLine) return null;
+        }
+        await nextTokenAttempt(wait);
       }
     },
     [uid],
@@ -159,7 +185,19 @@ export async function refreshAuthUser() {
 }
 
 export async function signOut() {
-  if (auth) await firebaseSignOut(auth);
+  try {
+    if (auth) await firebaseSignOut(auth);
+  } finally {
+    // Help chats can mention the user's balance and orders; don't leave them for
+    // whoever uses this tab next.
+    try {
+      for (const key of Object.keys(sessionStorage)) {
+        if (key.startsWith("sl_help_chat_")) sessionStorage.removeItem(key);
+      }
+    } catch {
+      // Storage is blocked, so nothing was kept there either.
+    }
+  }
 }
 
 /** Signs out and returns to the landing page. */
@@ -202,8 +240,7 @@ const SILENT = new Set(["auth/popup-closed-by-user", "auth/cancelled-popup-reque
 
 /** A message for a failed sign-in action, or null when there is nothing to report. */
 export function authErrorMessage(error: unknown): string | null {
-  const code =
-    typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+  const code = errorCode(error);
   if (SILENT.has(code)) return null;
   return MESSAGES[code] ?? `Sign-in failed${code ? ` (${code})` : ""}. Please try again.`;
 }
